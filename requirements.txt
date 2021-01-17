@@ -1,0 +1,4 @@
+git+git://github.com/Xenon-Bot/pylib
+git+git://github.com/merlinfuchs/discord-interactions
+motor==2.3
+aioredis==1.3
