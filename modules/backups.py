@@ -4,6 +4,7 @@ from xenon import *
 from xenon import rest
 from xenon.cmd import *
 import pymongo
+import pymongo.errors
 from datetime import datetime, timedelta
 
 from .audit_logs import AuditLogType
@@ -74,13 +75,7 @@ class BackupsModule(dc.Module):
             await asyncio.sleep(0.5)
             await coro
 
-        backup_id = unique_id()
-        await ctx.bot.db.backups.insert_one({
-            "_id": backup_id,
-            "creator": ctx.author.id,
-            "timestamp": datetime.utcnow(),
-            "data": saver.data
-        })
+        backup_id = await self._store_backup(ctx.author.id, saver.data)
 
         await asyncio.sleep(1)
         await ctx.edit_response(**create_message(
@@ -120,7 +115,7 @@ class BackupsModule(dc.Module):
 
         Get more help on the [wiki](https://wiki.xenon.bot/backups#loading-a-backup).
         """
-        backup = await ctx.bot.db.backups.find_one({"_id": backup_id, "creator": ctx.author.id})
+        backup = await self._retrieve_backup(ctx.author.id, backup_id)
         if backup is None:
             await ctx.respond_with_source(**create_message(
                 f"You have **no backup** with the id `{backup_id.upper()}`.\n\n"
@@ -315,7 +310,7 @@ class BackupsModule(dc.Module):
         """
         Get information about a previously created backup
         """
-        backup = await ctx.bot.db.backups.find_one({"_id": backup_id, "creator": ctx.author.id})
+        backup = await self._retrieve_backup(ctx.author.id, backup_id)
         if backup is None:
             await ctx.respond_with_source(**create_message(
                 f"You have **no backup** with the id `{backup_id.upper()}`.\n\n"
