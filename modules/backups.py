@@ -568,3 +568,48 @@ class BackupsModule(dc.Module):
                 f"Your backup interval is not enabled for this server.",
                 f=Format.ERROR
             ))
+
+    async def _retrieve_backup(self, creator, backup_id):
+        return await self.bot.db.backups.find_one({"_id": backup_id, "creator": creator})
+
+    async def _store_backup(self, creator, data, interval=False):
+        backup_id = unique_id()
+        await self.bot.db.backups.insert_one({
+            "_id": backup_id,
+            "creator": creator,
+            "timestamp": datetime.utcnow(),
+            "data": data,
+            "interval": interval
+        })
+        return backup_id
+
+    @dc.Module.task(minutes=5)
+    async def interval_task(self):
+        tasks = []
+        semaphore = asyncio.Semaphore(5)
+        to_backup = self.bot.db.premium.intervals.find({"next": {"$lt": datetime.utcnow()}})
+        async for interval in to_backup:
+            await semaphore.acquire()
+
+            async def _run_interval():
+                try:
+                    saver = GuildSaver(self.bot, interval["guild"])
+                    try:
+                        async for status, coro in saver.save(members=False, messages=False, chatlog=0):
+                            await coro
+                    except rest.HTTPNotFound:
+                        await self.bot.db.intervals.delete_many({"guild": interval["guild"]})
+
+                    await self.bot.db.backups.delete_many({
+                        "creator": interval["user"],
+                        "data.id": interval["guild"],
+                        "interval": True
+                    })
+                    await self._store_backup(interval["user"], saver.data, interval=True)
+                finally:
+                    semaphore.release()
+
+            tasks.append(self.bot.create_task(_run_interval()))
+
+        if len(tasks) != 0:
+            await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
