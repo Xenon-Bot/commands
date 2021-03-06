@@ -1,6 +1,5 @@
-import dc_interactions as dc
-from xenon import Role, Channel, rest, Message
-from xenon.cmd import *
+from dbots import Role, Channel, rest, Message
+from dbots.cmd import *
 import re
 import asyncio
 from datetime import timedelta, datetime
@@ -8,7 +7,7 @@ from datetime import timedelta, datetime
 from .audit_logs import AuditLogType
 
 
-class TemplatesModule(dc.Module):
+class TemplatesModule(Module):
     async def _get_template(self, identifier):
         template = await self.bot.mongo.dtpl.templates.find_one({
             "internal": True,
@@ -46,7 +45,7 @@ class TemplatesModule(dc.Module):
         except rest.HTTPNotFound:
             return None
 
-    @dc.Module.command()
+    @Module.command()
     async def template(self, ctx):
         """
         Choose from thousands of free server templates

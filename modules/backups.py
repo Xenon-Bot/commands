@@ -1,8 +1,7 @@
-import dc_interactions as dc
 import asyncio
-from xenon import *
-from xenon import rest
-from xenon.cmd import *
+from dbots import *
+from dbots import rest
+from dbots.cmd import *
 import pymongo
 import pymongo.errors
 from datetime import datetime, timedelta
@@ -12,7 +11,7 @@ from .audit_logs import AuditLogType
 MAX_BACKUPS = 15
 
 
-class BackupListMenu(ListMenu):
+class BackupListMenu(object):
     embed_kwargs = {"title": "Your Backups"}
     per_page = 10
 
@@ -40,8 +39,8 @@ class BackupListMenu(ListMenu):
         return items
 
 
-class BackupsModule(dc.Module):
-    @dc.Module.command()
+class BackupsModule(Module):
+    @Module.command()
     async def backup(self, ctx):
         """
         Create, load and manage your server backups
@@ -583,7 +582,7 @@ class BackupsModule(dc.Module):
         })
         return backup_id
 
-    @dc.Module.task(minutes=5)
+    @Module.task(minutes=5)
     async def interval_task(self):
         tasks = []
         semaphore = asyncio.Semaphore(5)

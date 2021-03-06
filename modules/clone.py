@@ -1,12 +1,11 @@
-import dc_interactions as dc
-from xenon.cmd import *
-from xenon import rest
+from dbots.cmd import *
+from dbots import rest
 import asyncio
 import traceback
 
 
-class CloneModule(dc.Module):
-    @dc.Module.command()
+class CloneModule(Module):
+    @Module.command()
     async def clone(self, ctx):
         """
         Create a clone of a channel or role
@@ -26,12 +25,12 @@ class CloneModule(dc.Module):
     @checks.bot_has_permissions("manage_channels")
     @checks.not_in_maintenance
     @checks.cooldown(1, 10, bucket=checks.CooldownType.GUILD, manual=True)
-    async def channel(self, ctx, channel: dc.CommandOptionType.CHANNEL, child_channels: bool = False):
+    async def channel(self, ctx, channel: CommandOptionType.CHANNEL, child_channels: bool = False):
         """
         Create a clone of channel including permission overwrites
         """
         channels = await ctx.fetch_guild_channels()
-        channel = dc.iterable_get(channels, id=channel)
+        channel = iterable_get(channels, id=channel)
         if channel is None:
             # Shouldn't be reachable unless the command was manipulated
             await ctx.respond_with_source(**create_message(
@@ -85,12 +84,12 @@ class CloneModule(dc.Module):
     @checks.bot_has_permissions("manage_channels", "manage_roles")
     @checks.not_in_maintenance
     @checks.cooldown(1, 20, bucket=checks.CooldownType.GUILD, manual=True)
-    async def role(self, ctx, role: dc.CommandOptionType.ROLE, apply_overwrites: bool = False):
+    async def role(self, ctx, role: CommandOptionType.ROLE, apply_overwrites: bool = False):
         """
         Create a clone of a role optionally including channel permission overwrites
         """
         roles = await ctx.fetch_guild_roles()
-        role = dc.iterable_get(roles, id=role)
+        role = iterable_get(roles, id=role)
         if role is None:
             # Shouldn't be reachable unless the command was manipulated
             await ctx.respond_with_source(**create_message(

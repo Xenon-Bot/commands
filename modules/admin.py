@@ -1,6 +1,5 @@
-import dc_interactions as dc
 from os import environ as env
-from xenon.cmd import *
+from dbots.cmd import *
 import inspect
 import textwrap
 import traceback
@@ -10,8 +9,8 @@ from datetime import datetime
 ADMIN_GUILD_ID = env.get("ADMIN_GUILD_ID", "496683369665658880")
 
 
-class AdminModule(dc.Module):
-    @dc.Module.command(guild_id=ADMIN_GUILD_ID)
+class AdminModule(Module):
+    @Module.command(guild_id=ADMIN_GUILD_ID)
     async def admin(self, ctx):
         """
         Manage the admin commands for a server
@@ -60,7 +59,7 @@ class AdminModule(dc.Module):
             f=Format.SUCCESS
         ))
 
-    @dc.Module.command(register=False)
+    @Module.command(register=False)
     @checks.is_bot_owner
     async def maintenance(self, ctx):
         """
@@ -81,7 +80,7 @@ class AdminModule(dc.Module):
                 f=Format.SUCCESS
             ))
 
-    @dc.Module.command(register=False)
+    @Module.command(register=False)
     async def morph(self, ctx, user_id=None):
         """
         Morph into and execute commands as a different user
@@ -112,7 +111,7 @@ class AdminModule(dc.Module):
             f=Format.SUCCESS
         ))
 
-    @dc.Module.command(register=False)
+    @Module.command(register=False)
     @checks.is_bot_owner
     async def eval(self, ctx, expression):
         """
@@ -141,7 +140,7 @@ class AdminModule(dc.Module):
                 f=Format.SUCCESS
             ))
 
-    @dc.Module.command(register=False)
+    @Module.command(register=False)
     @checks.is_bot_owner
     async def exec(self, ctx, snippet):
         """
@@ -180,7 +179,7 @@ class AdminModule(dc.Module):
                 f=Format.SUCCESS
             ))
 
-    @dc.Module.command(register=False)
+    @Module.command(register=False)
     @checks.is_bot_owner
     async def redis(self, ctx, cmd):
         """
@@ -193,7 +192,7 @@ class AdminModule(dc.Module):
             f=Format.SUCCESS
         ))
 
-    @dc.Module.command(register=False)
+    @Module.command(register=False)
     @checks.is_bot_owner
     async def error(self, ctx, error_id: str.lower):
         """
@@ -252,7 +251,7 @@ class AdminModule(dc.Module):
             await ctx.respond_with_source(embeds=embeds[:3])
             embeds = embeds[3:]
 
-    @dc.Module.command(register=False)
+    @Module.command(register=False)
     @checks.is_bot_owner
     async def blacklist(self, ctx):
         """

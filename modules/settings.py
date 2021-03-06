@@ -1,5 +1,5 @@
 import dc_interactions as dc
-from xenon.cmd import *
+from dbots.cmd import *
 
 PERMISSION_DESCRIPTIONS = {
     checks.PermissionLevels.ADMIN_ONLY: "Server admins can create backups, enable the backup interval and "
@@ -10,8 +10,8 @@ PERMISSION_DESCRIPTIONS = {
 }
 
 
-class SettingsModule(dc.Module):
-    @dc.Module.command()
+class SettingsModule(Module):
+    @Module.command()
     async def settings(self, ctx):
         """
         Manage Xenon internal settings for this server

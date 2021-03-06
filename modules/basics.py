@@ -1,9 +1,8 @@
-import dc_interactions as dc
-from xenon.cmd import *
+from dbots.cmd import *
 
 
-class BasicsModule(dc.Module):
-    @dc.Module.command()
+class BasicsModule(Module):
+    @Module.command()
     @checks.has_permissions_level()
     async def leave(self, ctx):
         """
@@ -12,7 +11,7 @@ class BasicsModule(dc.Module):
         await ctx.respond("Bye :(", ephemeral=True)
         await ctx.bot.http.leave_guild(ctx.guild_id)
 
-    @dc.Module.command(
+    @Module.command(
         extends=dict(
             command=dict(
                 description="The full name of the command"
@@ -33,7 +32,7 @@ class BasicsModule(dc.Module):
 
                     for sub_cmd in cmd.sub_commands:
                         if parts[1] == sub_cmd.name:
-                            if len(parts) == 2 or not isinstance(sub_cmd, dc.SubCommandGroup):
+                            if len(parts) == 2 or not isinstance(sub_cmd, SubCommandGroup):
                                 return sub_cmd
 
                             for sub_sub_cmd in sub_cmd.sub_commands:
@@ -70,14 +69,14 @@ class BasicsModule(dc.Module):
                 f=Format.ERROR
             ), ephemeral=True)
 
-    @dc.Module.command()
+    @Module.command()
     async def ping(self, ctx):
         """
         Ping? Pong!
         """
         await ctx.respond(f"Pong! <:stonks:763794050343370793>", ephemeral=True)
 
-    @dc.Module.command()
+    @Module.command()
     async def invite(self, ctx):
         """
         Invite Xenon to your server
@@ -87,7 +86,7 @@ class BasicsModule(dc.Module):
             ephemeral=True
         )
 
-    @dc.Module.command()
+    @Module.command()
     async def support(self, ctx):
         """
         Join the support server and get some help
@@ -97,7 +96,7 @@ class BasicsModule(dc.Module):
             ephemeral=True
         )
 
-    @dc.Module.command()
+    @Module.command()
     async def premium(self, ctx):
         """
         Get information about Xenon Premium

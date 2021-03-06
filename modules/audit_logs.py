@@ -1,8 +1,7 @@
-import dc_interactions as dc
 from enum import IntEnum
 import pymongo
 import asyncio
-from xenon.cmd import *
+from dbots.cmd import *
 
 
 class AuditLogType(IntEnum):
@@ -39,7 +38,7 @@ text_formats = {
 }
 
 
-class AuditLogList(ListMenu):
+class AuditLogList(object):
     embed_kwargs = {"title": "Audit Logs"}
 
     async def get_items(self):
@@ -63,10 +62,10 @@ class AuditLogList(ListMenu):
         return items
 
 
-class AuditLogModule(dc.Module):
+class AuditLogModule(Module):
     # TODO: audit log retention
 
-    @dc.Module.command()
+    @Module.command()
     async def audit(self, ctx):
         """
         Get a list of actions that were recently taken on this server

@@ -29,7 +29,7 @@ app = web.Application()
 
 @app.on_startup.append
 async def prepare_bot(*_):
-    await bot.prepare()
+    await bot.setup(env.get("REDIS_URL", "redis://localhost"))
 
 
 if __name__ == "__main__":

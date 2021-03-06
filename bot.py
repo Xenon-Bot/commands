@@ -1,6 +1,5 @@
-from xenon import *
-from xenon.cmd import *
-import dc_interactions as dc
+from dbots import *
+from dbots.cmd import *
 from motor.motor_asyncio import AsyncIOMotorClient
 import aioredis
 import json
@@ -10,16 +9,25 @@ import asyncio
 import traceback
 import sys
 from datetime import datetime
+import grpclib.client
+from dbots.protos import backups_grpc
 
 
-class Xenon(dc.InteractionBot):
+class RpcCollection:
+    def __init__(self):
+        self.backups = backups_grpc.BackupsStub(grpclib.client.Channel("localhost", 8081))
+
+
+class Xenon(InteractionBot):
     def __init__(self, **kwargs):
-        super().__init__(**kwargs, ctx_klass=CustomContext)
+        super().__init__(**kwargs)
         self.mongo = AsyncIOMotorClient(env.get("MONGO_URL", "mongodb://localhost"))
         self.db = self.mongo.xenon
         self.redis = None
         self.http = None
         self.relay = None
+
+        self.rpc = RpcCollection()
 
         self._receiver = aioredis.pubsub.Receiver()
 
@@ -54,7 +62,7 @@ class Xenon(dc.InteractionBot):
         if is_blacklisted:
             await self.redis.incr("cmd:commands:blocked")
             await self.redis.setex(f"cmd:blacklist:{block_bucket}", random.randint(60 * 15, 60 * 60), 1)
-            return dc.InteractionResponse.message(**create_message(
+            return InteractionResponse.message(**create_message(
                 "You are being **blocked from using Xenon commands** due to exceeding internal rate limits. "
                 "These rate limits are in place to protect our infrastructure. Please be patient and wait a few hours "
                 "before trying to run another command.",
@@ -70,7 +78,7 @@ class Xenon(dc.InteractionBot):
             await self.redis.setex(f"cmd:commands:{block_bucket}", 2, cmd_count + 1)
 
         # Apply morph
-        morph_target = await self.redis.get(f"cmd:morph:{payload.member['user']['id']}")
+        morph_target = await self.redis.get(f"cmd:morph:{payload.member.id}")
         if morph_target is not None:
             try:
                 member = await self.http.get_guild_member(payload.guild_id, morph_target.decode())
@@ -101,23 +109,3 @@ class Xenon(dc.InteractionBot):
         async for channel, msg in self._receiver.iter():
             event_name = channel.name.decode().replace("gateway:events:", "")
             self.dispatch(event_name, json.loads(msg))
-
-    async def prepare(self):
-        self.redis = await aioredis.create_redis_pool(env.get("REDIS_URL", "redis://localhost"))
-
-        self.relay = com.Relay(self.redis)
-        self.relay.start_reader()
-
-        ratelimits = rest.RedisRatelimitHandler(self.redis)
-        self.http = rest.HTTPClient(self.token, ratelimits)
-
-        self.loop.create_task(self.gateway_subscriber())
-
-        await super().prepare()
-        # await self.flush_commands()
-        self.loop.create_task(self.push_commands())
-
-    def make_request(self, method, path, data=None, **params):
-        req = rest.Request(method, path, **params)
-        self.http.start_request(req, json=data)
-        return req
