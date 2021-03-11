@@ -107,3 +107,23 @@ class BasicsModule(Module):
             "and find a detailed list of perks [here](https://wiki.xenon.bot/premium)",
             ephemeral=True
         )
+
+    @Module.command()
+    async def confirm(self, ctx):
+        """
+        Confirm to an action
+        """
+        event = self.bot.confirmations.get(f"{ctx.channel_id}{ctx.author.id}")
+        if event is None:
+            await ctx.respond(
+                "There is **nothing to confirm to**. Please try running your original command again.",
+                ephemeral=True
+            )
+            return
+
+        event.set()
+        event.clear()
+        await ctx.respond(
+            "Your action has been confirmed, you can delete this message.",
+            ephemeral=True
+        )

@@ -1,5 +1,5 @@
 from dbots.cmd import *
-from dbots import rest
+from dbots import *
 import asyncio
 import traceback
 
@@ -13,12 +13,8 @@ class CloneModule(Module):
 
     @clone.sub_command(
         extends=dict(
-            role=dict(
-                description="The channel to clone"
-            ),
-            apply_overwrites=dict(
-                description="Wether to also clone all child channels (only applies if the channel is a category)"
-            )
+            role="The channel to clone",
+            apply_overwrites="Wether to also clone all child channels (only applies if the channel is a category)"
         )
     )
     @checks.has_permissions_level(destructive=True)
@@ -72,12 +68,8 @@ class CloneModule(Module):
 
     @clone.sub_command(
         extends=dict(
-            role=dict(
-                description="The role to clone"
-            ),
-            apply_overwrites=dict(
-                description="Wether to apply permission overwrites from the original role to the new one"
-            )
+            role="The role to clone",
+            apply_overwrites="Wether to apply permission overwrites from the original role to the new one"
         )
     )
     @checks.has_permissions_level(destructive=True)

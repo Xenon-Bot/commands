@@ -1,4 +1,3 @@
-import dc_interactions as dc
 from dbots.cmd import *
 
 PERMISSION_DESCRIPTIONS = {
@@ -26,7 +25,7 @@ class SettingsModule(Module):
         settings = await ctx.bot.db.guilds.find_one({"_id": ctx.guild_id}) or {}
         permissions_level = settings.get("permissions_level", PermissionLevels.DESTRUCTIVE_OWNER)
 
-        await ctx.respond_with_source(embeds=[{
+        await ctx.respond(embeds=[{
             "title": "Server Settings",
             "color": Format.INFO.color,
             "fields": [
@@ -45,7 +44,7 @@ class SettingsModule(Module):
         Reset the settings for this server to the default values
         """
         await ctx.bot.db.guilds.delete_one({"_id": ctx.guild_id})
-        await ctx.respond_with_source(**create_message(
+        await ctx.respond(**create_message(
             "Successfully **reset settings** to the default values.",
             f=Format.SUCCESS
         ))
@@ -92,7 +91,7 @@ class SettingsModule(Module):
             {"$set": {"_id": ctx.guild_id, "permissions_level": level}},
             upsert=True
         )
-        await ctx.respond_with_source(**create_message(
+        await ctx.respond(**create_message(
             "__Changed the permissions level for this server to:__\n\n"
             f"**{PERMISSION_DESCRIPTIONS[level]}**.\n\n"
             f"*Use `/help settings permissions` to get more info.*",

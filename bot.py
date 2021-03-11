@@ -11,6 +11,7 @@ import sys
 from datetime import datetime
 import grpclib.client
 from dbots.protos import backups_grpc
+import weakref
 
 
 class RpcCollection:
@@ -30,6 +31,15 @@ class Xenon(InteractionBot):
         self.rpc = RpcCollection()
 
         self._receiver = aioredis.pubsub.Receiver()
+        self.confirmations = weakref.WeakValueDictionary()
+
+    async def wait_for_confirmation(self, ctx, timeout=30):
+        key = f"{ctx.channel_id}{ctx.author.id}"
+        event = self.confirmations.get(key)
+        if event is None:
+            event = self.confirmations[key] = asyncio.Event()
+
+        await asyncio.wait_for(event.wait(), timeout=timeout)
 
     async def on_command_error(self, ctx, e):
         if isinstance(e, asyncio.CancelledError):
@@ -46,7 +56,7 @@ class Xenon(InteractionBot):
                 "author": ctx.author.id,
                 "traceback": tb
             }))
-            await ctx.respond_with_source(**create_message(
+            await ctx.respond(**create_message(
                 "An unexpected error occurred. Please report this on the "
                 "[Support Server](https://xenon.bot/discord).\n\n"
                 f"**Error Code**: `{error_id.upper()}`",

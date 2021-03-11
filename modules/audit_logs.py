@@ -1,7 +1,7 @@
 from enum import IntEnum
 import pymongo
-import asyncio
 from dbots.cmd import *
+from dbots import *
 
 
 class AuditLogType(IntEnum):
@@ -38,30 +38,6 @@ text_formats = {
 }
 
 
-class AuditLogList(object):
-    embed_kwargs = {"title": "Audit Logs"}
-
-    async def get_items(self):
-        args = {
-            "limit": 10,
-            "skip": self.page * 10,
-            "sort": [("timestamp", pymongo.DESCENDING)],
-            "filter": {
-                "guilds": self.ctx.guild_id,
-            }
-        }
-        logs = self.ctx.bot.db.audit_logs.find(**args)
-        items = []
-        async for audit_log in logs:
-            type = AuditLogType(audit_log["type"])
-            items.append((
-                datetime_to_string(audit_log["timestamp"]) + " UTC - *" + type.name.replace('_', ' ').title() + "*",
-                f"{text_formats[type].format(**audit_log, **audit_log['extra'])}"
-            ))
-
-        return items
-
-
 class AuditLogModule(Module):
     # TODO: audit log retention
 
@@ -74,12 +50,42 @@ class AuditLogModule(Module):
     @audit.sub_command()
     @checks.has_permissions_level()
     @checks.cooldown(1, 10, bucket=checks.CooldownType.GUILD)
-    async def logs(self, ctx):
+    async def logs(self, ctx, page: int = 1):
         """
         Get a list of actions that were recently taken on this server
         """
-        await ctx.ack_with_source()
-        await asyncio.sleep(0.1)
+        _filter = {"guilds": ctx.guild_id}
+        total_count = await self.bot.db.audit_logs.count_documents(_filter)
+        if total_count == 0:
+            await ctx.respond(**create_message(
+                "You **don't have any backups** yet. Use `/backup create` to create one.",
+                f=Format.ERROR,
+                embed=False
+            ), ephemeral=True)
+            return
 
-        menu = AuditLogList(ctx)
-        await menu.start()
+        fields = []
+        async for entry in self.bot.db.audit_logs.find(
+                _filter,
+                sort=[("timestamp", pymongo.DESCENDING)],
+                limit=10,
+                skip=(page - 1) * 10
+        ):
+            _type = AuditLogType(entry["type"])
+            fields.append(dict(
+                name=datetime_to_string(entry["timestamp"]) + " UTC - *" +
+                     _type.name.replace('_', ' ').title() + "*",
+                value=f"{text_formats[_type].format(**entry, **entry['extra'])}"
+            ))
+
+        description = f"Displaying **{(page - 1) * 10 + 1}** - **{min(page * 10, total_count)}** " \
+                      f"of **{total_count}** total entries"
+        if total_count > page * 10:
+            description += f"\n\nType `/audit logs {page + 1}` for the next page"
+
+        await ctx.respond(embeds=[dict(
+            title="Audit Logs",
+            fields=fields,
+            color=Format.INFO.color,
+            description=f"{description}\n​"
+        )])
