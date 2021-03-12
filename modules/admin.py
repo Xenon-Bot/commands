@@ -1,5 +1,6 @@
 from os import environ as env
 from dbots.cmd import *
+from dbots import *
 import inspect
 import textwrap
 import traceback
@@ -10,52 +11,38 @@ ADMIN_GUILD_ID = env.get("ADMIN_GUILD_ID", "496683369665658880")
 
 
 class AdminModule(Module):
-    @Module.command(guild_id=ADMIN_GUILD_ID)
-    async def admin(self, ctx):
+    @Module.command()
+    async def debug(self, ctx):
         """
         Manage the admin commands for a server
         """
 
-    @admin.sub_command()
+    @debug.sub_command()
+    @guild_only
     @checks.is_bot_owner
-    async def enable(self, ctx, guild_id=None):
+    async def enable(self, ctx):
         """
-        Add the admin commands to a server
+        Register the debug commands on this server
         """
-        guild_id = guild_id or ctx.guild_id
-        await ctx.ack_with_source()
-
-        for command in self.commands:
-            if command.register:
-                continue
-
-            await self.bot.create_command(command, guild_id=guild_id)
-
-        await ctx.respond_with_source(**create_message(
-            f"Admin commands are now available on the server with the id `{guild_id}`",
+        await self.bot.http.replace_guild_commands(ctx.guild_id, [
+            c.to_payload() for c in self.commands
+            if not c.register
+        ])
+        await ctx.respond(**create_message(
+            f"Admin commands are now available on the server with the id `{ctx.guild_id}`",
             f=Format.SUCCESS
         ))
 
-    @admin.sub_command()
+    @debug.sub_command()
+    @guild_only
     @checks.is_bot_owner
-    async def disable(self, ctx, guild_id=None):
+    async def disable(self, ctx):
         """
-        Remove the admin commands from a server
+        Unregister the debug commands on this server
         """
-        guild_id = guild_id or ctx.guild_id
-        await ctx.ack_with_source()
-
-        existing_commands = await ctx.bot.fetch_commands(guild_id=guild_id)
-        for command in self.commands:
-            if command.register:
-                continue
-
-            for ex_cmd in existing_commands:
-                if ex_cmd["name"] == command.name:
-                    await self.bot.delete_command(ex_cmd["id"], guild_id=guild_id)
-
-        await ctx.respond_with_source(**create_message(
-            f"Admin commands are no longer available on the server with the id `{guild_id}`",
+        await self.bot.http.replace_guild_commands(ctx.guild_id, [])
+        await ctx.respond(**create_message(
+            f"Admin commands are no longer available on the server with the id `{ctx.guild_id}`",
             f=Format.SUCCESS
         ))
 
@@ -68,48 +55,17 @@ class AdminModule(Module):
         current = await self.bot.redis.exists("cmd:maintenance")
         if current:
             await self.bot.redis.delete("cmd:maintenance")
-            await ctx.respond_with_source(**create_message(
+            await ctx.respond(**create_message(
                 "**Disabled maintenance** mode.",
                 f=Format.SUCCESS
             ))
 
         else:
             await self.bot.redis.set("cmd:maintenance", "1")
-            await ctx.respond_with_source(**create_message(
+            await ctx.respond(**create_message(
                 "**Enabled maintenance** mode.",
                 f=Format.SUCCESS
             ))
-
-    @Module.command(register=False)
-    async def morph(self, ctx, user_id=None):
-        """
-        Morph into and execute commands as a different user
-        """
-        if user_id is None:
-            morph_source = getattr(ctx.payload, "morph_source", None)
-            if morph_source is None:
-                await ctx.respond_with_source(**create_message(
-                    "You are already executing commands as yourself.",
-                    f=Format.SUCCESS
-                ))
-                return
-
-            await ctx.bot.redis.delete(f"cmd:morph:{morph_source}")
-            await ctx.respond_with_source(**create_message(
-                "You are now executing commands as yourself.",
-                f=Format.SUCCESS
-            ))
-            return
-
-        check_result = await checks.is_bot_owner.run(ctx)
-        if check_result is not True:
-            return
-
-        await ctx.bot.redis.set(f"cmd:morph:{ctx.author.id}", user_id)
-        await ctx.respond_with_source(**create_message(
-            f"You are now executing commands as <@{user_id}>.",
-            f=Format.SUCCESS
-        ))
 
     @Module.command(register=False)
     @checks.is_bot_owner
@@ -127,14 +83,14 @@ class AdminModule(Module):
 
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            await ctx.respond_with_source(**create_message(
+            await ctx.respond(**create_message(
                 f"```py\n{tb[:1900]}```",
                 title="Eval Error",
                 f=Format.SUCCESS
             ))
 
         else:
-            await ctx.respond_with_source(**create_message(
+            await ctx.respond(**create_message(
                 f"```py\n{result}```",
                 title="Eval Result",
                 f=Format.SUCCESS
@@ -166,14 +122,14 @@ class AdminModule(Module):
 
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            await ctx.respond_with_source(**create_message(
+            await ctx.respond(**create_message(
                 f"```py\n{tb[:1900]}```",
                 title="Exec Error",
                 f=Format.SUCCESS
             ))
 
         else:
-            await ctx.respond_with_source(**create_message(
+            await ctx.respond(**create_message(
                 f"```py\n{result}```",
                 title="Exec Result",
                 f=Format.SUCCESS
@@ -186,7 +142,7 @@ class AdminModule(Module):
         Execute a redis command
         """
         result = await ctx.bot.redis.execute(*cmd.split(" "))
-        await ctx.respond_with_source(**create_message(
+        await ctx.respond(**create_message(
             f"```py\n{result}\n```",
             title="Redis Result",
             f=Format.SUCCESS
@@ -200,7 +156,7 @@ class AdminModule(Module):
         """
         error = await ctx.bot.redis.get(f"cmd:errors:{error_id}")
         if error is None:
-            await ctx.respond_with_source(**create_message(
+            await ctx.respond(**create_message(
                 f"**Unknown error** with the id `{error_id.upper()}`.",
                 f=Format.ERROR
             ))
@@ -248,7 +204,7 @@ class AdminModule(Module):
             })
 
         while len(embeds) > 0:
-            await ctx.respond_with_source(embeds=embeds[:3])
+            await ctx.respond(embeds=embeds[:3])
             embeds = embeds[3:]
 
     @Module.command(register=False)

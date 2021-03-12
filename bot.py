@@ -67,7 +67,7 @@ class Xenon(InteractionBot):
         await self.redis.hincrby("cmd:commands", command.full_name, 1)
 
         # Global rate limits to prevent abuse
-        block_bucket = payload.guild_id or payload.member["user"]["id"]
+        block_bucket = payload.guild_id or payload.author.id
         is_blacklisted = await self.redis.exists(f"cmd:blacklist:{block_bucket}")
         if is_blacklisted:
             await self.redis.incr("cmd:commands:blocked")
@@ -86,29 +86,6 @@ class Xenon(InteractionBot):
 
         else:
             await self.redis.setex(f"cmd:commands:{block_bucket}", 2, cmd_count + 1)
-
-        # Apply morph
-        morph_target = await self.redis.get(f"cmd:morph:{payload.member.id}")
-        if morph_target is not None:
-            try:
-                member = await self.http.get_guild_member(payload.guild_id, morph_target.decode())
-            except rest.HTTPNotFound:
-                pass
-            else:
-                guild = await self.http.get_guild(payload.guild_id)
-                if guild.owner_id == member.id:
-                    perms = Permissions.all()
-
-                else:
-                    perms = Permissions.none()
-                    roles = sorted(guild.roles, key=lambda r: r.position)
-                    for role in roles:
-                        if role.id in member.roles:
-                            perms.value |= role.permissions.value
-
-                payload.morph_source = payload.member['user']['id']
-                payload.member = member.to_dict()
-                payload.member["permissions"] = perms.value
 
         return await super().execute_command(command, payload, remaining_options)
 
