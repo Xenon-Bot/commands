@@ -17,7 +17,9 @@ class SettingsModule(Module):
         """
 
     @settings.sub_command()
-    @checks.cooldown(2, 10, bucket=checks.CooldownType.GUILD)
+    @guild_only
+    @has_permissions(administrator=True)
+    @cooldown(2, 10, bucket=checks.CooldownType.GUILD)
     async def show(self, ctx):
         """
         Show the current settings for this server
@@ -37,6 +39,7 @@ class SettingsModule(Module):
         }])
 
     @settings.sub_command()
+    @guild_only
     @checks.is_guild_owner
     @checks.cooldown(1, 10, bucket=checks.CooldownType.GUILD)
     async def reset(self, ctx):
@@ -72,6 +75,7 @@ class SettingsModule(Module):
                          f"{PERMISSION_DESCRIPTIONS[PermissionLevels.OWNER_ONLY]}"
                          f"```/settings permissions owner```"
     )
+    @guild_only
     @checks.is_guild_owner
     @checks.cooldown(1, 10, bucket=checks.CooldownType.GUILD)
     async def permissions(self, ctx, level):

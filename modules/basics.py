@@ -3,6 +3,7 @@ from dbots.cmd import *
 
 class BasicsModule(Module):
     @Module.command()
+    @guild_only
     @checks.has_permissions_level()
     async def leave(self, ctx):
         """

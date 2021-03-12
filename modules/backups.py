@@ -23,7 +23,7 @@ def channel_tree(channels):
     def _format_channel(channel, spacing=0):
         prefixes = {
             ChannelType.GUILD_TEXT: "#",
-            ChannelType.GUILD_VOICE: ">",
+            ChannelType.GUILD_VOICE: "<",
             ChannelType.GUILD_CATEGORY: "\n˅",
             ChannelType.GUILD_NEWS: "!",
             ChannelType.GUILD_STORE: "$"
@@ -62,7 +62,35 @@ def warning_list(options):
 
 
 def convert_v1_to_v2(data):
+    messages = data.get("messages", {})
     channels = []
+    for channel in data["channels"]:
+        channels.append(
+            backups_pb2.BackupData.Channel(
+                id=channel["id"],
+                type=channel["type"],
+                name=channel["name"],
+                position=channel["position"],
+                overwrites=[
+                    backups_pb2.BackupData.Channel.Overwrite(
+                        id=ov["id"],
+                        type=ov["type"],
+                        allow=ov["allow"],
+                        deny=ov["deny"]
+                    )
+                    for ov in channel["permission_overwrites"]
+                ],
+                parent_id=channel.get("parent_id"),
+
+                topic=channel.get("topic"),
+                nsfw=channel.get("nsfw"),
+                rate_limit_per_user=channel.get("rate_limit_per_user"),
+                messages=[],  # TODO: convert messages
+
+                bitrate=channel.get("bitrate"),
+                user_limit=channel.get("user_limit")
+            )
+        )
 
     return backups_pb2.BackupData(
         id=data["id"],
@@ -78,8 +106,6 @@ def convert_v1_to_v2(data):
         rules_channel_id=data.get("rules_channel_id"),
         public_updates_channel_id=data.get("public_updates_channel_id"),
         preferred_locale=data.get("preferred_locale"),
-        splash=data.get("splash"),
-        banner=data.get("banner"),
 
         channels=channels,
         roles=[
@@ -125,6 +151,7 @@ class BackupsModule(Module):
         """
 
     @backup.sub_command()
+    @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(1, 30, bucket=checks.CooldownType.GUILD, manual=True)
     async def create(self, ctx):
@@ -144,12 +171,12 @@ class BackupsModule(Module):
             ))
             return
 
-        # await ctx.count_cooldown()
+        await ctx.count_cooldown()
         await ctx.respond(**create_message("Creating backup ...", f=Format.PLEASE_WAIT))
 
         replies = await self.bot.rpc.backups.Create(backups_pb2.CreateRequest(
             guild_id=ctx.guild_id,
-            options=["roles", "channels"],
+            options=["roles", "channels", "settings"],
             message_count=0
         ))
 
@@ -179,6 +206,7 @@ class BackupsModule(Module):
             options="An optional list of options"
         )
     )
+    @checks.guild_only
     @checks.has_permissions_level(destructive=True)
     @checks.bot_has_permissions("administrator")
     @checks.not_in_maintenance
@@ -198,8 +226,7 @@ class BackupsModule(Module):
             ))
             return
 
-        # Fill options object
-        allowed = ("delete_roles", "delete_channels", "roles", "channels", "update")
+        allowed = ("delete_roles", "delete_channels", "roles", "channels", "update", "settings")
         parsed_options = {"delete_roles", "delete_channels", "roles", "channels", "settings"}
         for option in options.replace("-", "_").split(" "):
             if option == "!*":
@@ -215,7 +242,7 @@ class BackupsModule(Module):
                 parsed_options.add(option)
 
         # Require a confirmation by the user
-        status_msg = await ctx.respond(**create_message(
+        await ctx.respond(**create_message(
             "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
             f"{warning_list(parsed_options)}\n\n"
             f"Type `/confirm` to confirm this action and continue.",
@@ -225,10 +252,10 @@ class BackupsModule(Module):
         try:
             await self.bot.wait_for_confirmation(ctx, timeout=60)
         except asyncio.TimeoutError:
-            await ctx.delete_response(status_msg.id)
+            await ctx.delete_response()
             return
 
-        # await ctx.count_cooldown()
+        await ctx.count_cooldown()
 
         # Create audit log entry
         await self.bot.db.audit_logs.insert_one({
@@ -239,38 +266,74 @@ class BackupsModule(Module):
             "extra": {}
         })
 
+        ids = {}
+        translator = await ctx.bot.db.id_translators.find_one({
+            "target_id": ctx.guild_id,
+            "source_id": data.id
+        })
+        if translator is not None:
+            ids = translator["ids"]
+
+        await ctx.edit_response(**create_message(
+            "**The backup is now loading**. Please be patient, this can take a while!\n\n"
+            "Use `/backup status` to get the current status and `/backup cancel` to cancel the process.\n\n"
+            "*This message will not be updated.*",
+            f=Format.INFO
+        ))
+        await asyncio.sleep(5)
+
         try:
-            async with self.bot.rpc.backups.Load.open() as stream:
-                await stream.send_message(backups_pb2.LoadRequest(
-                    guild_id=ctx.guild_id,
-                    options=list(parsed_options),
-                    message_count=0,
-                    data=data,
-                    reason="Backup loaded by " + str(ctx.author)
-                ), end=True)
-                async for reply in stream:
-                    await ctx.edit_response(**create_message(
-                        reply.status,
-                        f=Format.PLEASE_WAIT
-                    ), message_id=status_msg.id)
+            replies = await self.bot.rpc.backups.Load(backups_pb2.LoadRequest(
+                guild_id=ctx.guild_id,
+                options=list(parsed_options),
+                message_count=0,
+                data=data,
+                reason="Backup loaded by " + str(ctx.author),
+                ids=ids
+            ))
         except GRPCError as e:
             if e.status == grpclib.Status.ALREADY_EXISTS:
                 await ctx.edit_response(**create_message(
                     f"There is **already a loading process running** on this server.\n"
                     f"Please wait for it to finish or use `/backup cancel` to stop it.",
                     f=Format.ERROR
-                ), message_id=status_msg.id)
+                ))
                 return
-
             else:
                 raise
 
-        await ctx.edit_response(**create_message(
-            f"Successfully **loaded the backup**.",
-            f=Format.SUCCESS
-        ), message_id=status_msg.id)
+        try:
+            await ctx.edit_response(**create_message(
+                f"Successfully **loaded the backup**.",
+                f=Format.SUCCESS
+            ))
+        except rest.HTTPNotFound:
+            pass
+
+        # Save ids for later use and recovery
+        await ctx.bot.db.id_translators.update_one(
+            {
+                "target_id": ctx.guild_id,
+                "source_id": data.id,
+            },
+            {
+                "$set": {
+                    "target_id": ctx.guild_id,
+                    "source_id": data.id,
+                    **{
+                        f"ids.{s}": t
+                        for s, t in replies[-1].ids.items()
+                    }
+                },
+                "$addToSet": {
+                    "loaders": ctx.author.id
+                }
+            },
+            upsert=True
+        )
 
     @backup.sub_command()
+    @checks.guild_only
     @checks.has_permissions_level(destructive=True)
     async def cancel(self, ctx):
         """
@@ -294,6 +357,7 @@ class BackupsModule(Module):
         ))
 
     @backup.sub_command()
+    @checks.guild_only
     @checks.has_permissions_level()
     async def status(self, ctx):
         """
@@ -311,7 +375,7 @@ class BackupsModule(Module):
             else:
                 raise
 
-        await ctx.respond_with_source(**create_message(
+        await ctx.respond(**create_message(
             f"{reply.status} ...\n\n"
             f"*Please be patient, this could take a while.*",
             title="Loader Status",
@@ -484,7 +548,7 @@ class BackupsModule(Module):
             ))
             return
 
-        warning_msg = await ctx.respond(**create_message(
+        await ctx.respond(**create_message(
             f"Are you sure that you want to delete **{delete_count}** of **{total_count}** total backups?\n\n"
             "Type `/confirm` to confirm this action and continue.",
             f=Format.WARNING
@@ -493,7 +557,7 @@ class BackupsModule(Module):
         try:
             await self.bot.wait_for_confirmation(ctx, timeout=60)
         except asyncio.TimeoutError:
-            await ctx.delete_response(warning_msg.id)
+            await ctx.delete_response()
             return
 
         deleted_count = await self._delete_backups(_filter)
@@ -502,7 +566,7 @@ class BackupsModule(Module):
         await ctx.edit_response(**create_message(
             f"Successfully deleted **{deleted_count}** of **{total_count}** total backups.",
             f=Format.SUCCESS
-        ), message_id=warning_msg.id)
+        ))
 
     @backup.sub_command_group()
     async def interval(self, ctx):
@@ -513,6 +577,7 @@ class BackupsModule(Module):
         """
 
     @interval.sub_command()
+    @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(2, 10, bucket=checks.CooldownType.AUTHOR)
     async def show(self, ctx):
@@ -557,6 +622,7 @@ class BackupsModule(Module):
             interval="The interval in which the backups are created (e.g. 24h)"
         )
     )
+    @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(1, 10, bucket=checks.CooldownType.AUTHOR)
     async def on(self, ctx, interval="24h"):
@@ -594,6 +660,7 @@ class BackupsModule(Module):
         })
 
     @interval.sub_command()
+    @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(1, 10, bucket=checks.CooldownType.AUTHOR)
     async def off(self, ctx):
@@ -695,7 +762,7 @@ class BackupsModule(Module):
 
         return result.deleted_count + count
 
-    @Module.task(minutes=5)
+    @Module.task(minutes=20)
     async def interval_task(self):
         tasks = []
         semaphore = asyncio.Semaphore(5)
@@ -708,7 +775,7 @@ class BackupsModule(Module):
                     try:
                         replies = await self.bot.rpc.backups.Create(backups_pb2.CreateRequest(
                             guild_id=interval["guild"],
-                            options=["roles", "channels"]
+                            options=["roles", "channels", "settings"]
                         ))
                     except GRPCError as e:
                         if e.status == grpclib.Status.NOT_FOUND:

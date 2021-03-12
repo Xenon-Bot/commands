@@ -48,6 +48,7 @@ class AuditLogModule(Module):
         """
 
     @audit.sub_command()
+    @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(1, 10, bucket=checks.CooldownType.GUILD)
     async def logs(self, ctx, page: int = 1):
