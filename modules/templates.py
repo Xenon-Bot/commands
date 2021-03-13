@@ -8,7 +8,7 @@ from dbots.protos import backups_pb2
 import grpclib
 
 from .audit_logs import AuditLogType
-from .backups import warning_list, convert_v1_to_v2, channel_tree
+from .backups import warning_list, convert_v1_to_v2, channel_tree, parse_options
 
 
 class TemplatesModule(Module):
@@ -100,7 +100,7 @@ class TemplatesModule(Module):
     @checks.bot_has_permissions("administrator")
     @checks.not_in_maintenance
     @checks.cooldown(1, 5 * 60, bucket=checks.CooldownType.GUILD, manual=True)
-    async def load(self, ctx, name_or_id, options=""):
+    async def load(self, ctx, name_or_id, options: str.lower = ""):
         """
         Load one of the public templates
 
@@ -116,20 +116,11 @@ class TemplatesModule(Module):
             ))
             return
 
-        allowed = ("delete_roles", "delete_channels", "roles", "channels", "settings")
-        parsed_options = {"delete_roles", "delete_channels", "roles", "channels", "settings"}
-        for option in options.replace("-", "_").split(" "):
-            if option == "!*":
-                parsed_options.clear()
-            elif option == "*":
-                parsed_options = set(allowed)
-            elif option.startswith("!"):
-                try:
-                    parsed_options.remove(option[1:])
-                except KeyError:
-                    pass
-            elif option in allowed:
-                parsed_options.add(option)
+        parsed_options = parse_options(
+            ("delete_roles", "delete_channels", "roles", "channels", "settings"),
+            ("delete_roles", "delete_channels", "roles", "channels", "settings"),
+            options
+        )
 
         # Require a confirmation by the user
         await ctx.respond(**create_message(
@@ -167,7 +158,7 @@ class TemplatesModule(Module):
         await ctx.edit_response(**create_message(
             "**The template is now loading**. Please be patient, this can take a while!\n\n"
             "Use `/template status` to get the current status and `/template cancel` to cancel the process.\n\n"
-            "*This message will not be updated.*",
+            "*This message might not be updated.*",
             f=Format.INFO
         ))
         await asyncio.sleep(5)

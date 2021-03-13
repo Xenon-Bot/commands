@@ -139,6 +139,25 @@ def convert_v1_to_v2(data):
     )
 
 
+def parse_options(default, allowed, option_string):
+    options = set(default)
+
+    for option in option_string.lower().replace("-", "_").split(" "):
+        if option == "!*":
+            options.clear()
+        elif option == "*":
+            options = set(allowed)
+        elif option.startswith("!"):
+            try:
+                options.remove(option[1:])
+            except KeyError:
+                pass
+        elif option in allowed:
+            options.add(option)
+
+    return options
+
+
 class BackupsModule(Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -226,20 +245,11 @@ class BackupsModule(Module):
             ))
             return
 
-        allowed = ("delete_roles", "delete_channels", "roles", "channels", "update", "settings")
-        parsed_options = {"delete_roles", "delete_channels", "roles", "channels", "settings"}
-        for option in options.replace("-", "_").split(" "):
-            if option == "!*":
-                parsed_options.clear()
-            elif option == "*":
-                parsed_options = set(allowed)
-            elif option.startswith("!"):
-                try:
-                    parsed_options.remove(option[1:])
-                except KeyError:
-                    pass
-            elif option in allowed:
-                parsed_options.add(option)
+        parsed_options = parse_options(
+            ("delete_roles", "delete_channels", "roles", "channels", "settings"),
+            ("delete_roles", "delete_channels", "roles", "channels", "update", "settings"),
+            options
+        )
 
         # Require a confirmation by the user
         await ctx.respond(**create_message(
@@ -277,7 +287,7 @@ class BackupsModule(Module):
         await ctx.edit_response(**create_message(
             "**The backup is now loading**. Please be patient, this can take a while!\n\n"
             "Use `/backup status` to get the current status and `/backup cancel` to cancel the process.\n\n"
-            "*This message will not be updated.*",
+            "*This message might not be updated.*",
             f=Format.INFO
         ))
         await asyncio.sleep(5)
