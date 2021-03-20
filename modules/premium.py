@@ -1,4 +1,4 @@
-import dc_interactions as dc
+from dbots.cmd import *
 
 PREMIUM_ONLY_TEXT = "This command can **only** be used with **Xenon Premium**.\n\n" \
                     "**Xenon Premium** is the **paid version** of Xenon.\n" \
@@ -6,8 +6,8 @@ PREMIUM_ONLY_TEXT = "This command can **only** be used with **Xenon Premium**.\n
                     "and find a detailed list of perks [here](https://wiki.xenon.bot/premium)"
 
 
-class PremiumModule(dc.Module):
-    @dc.Module.command()
+class PremiumModule(Module):
+    @Module.command()
     async def chatlog(self, ctx):
         """
         Save & load messages from individual channels
@@ -16,7 +16,7 @@ class PremiumModule(dc.Module):
         """
         await ctx.respond(PREMIUM_ONLY_TEXT, ephemeral=True)
 
-    @dc.Module.command()
+    @Module.command()
     async def sync(self, ctx):
         """
         Sync messages, bans and role assignments between different servers and channels
@@ -25,7 +25,7 @@ class PremiumModule(dc.Module):
         """
         await ctx.respond(PREMIUM_ONLY_TEXT, ephemeral=True)
 
-    @dc.Module.command()
+    @Module.command()
     async def copy(self, ctx):
         """
         Copy a server without creating a backup
