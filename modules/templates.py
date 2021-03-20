@@ -215,6 +215,7 @@ class TemplatesModule(Module):
 
     @template.sub_command()
     @checks.has_permissions_level(destructive=True)
+    @checks.cooldown(2, 30, bucket=checks.CooldownType.GUILD)
     async def cancel(self, ctx):
         """
         Cancel the currently running loading process on this server
@@ -238,6 +239,7 @@ class TemplatesModule(Module):
 
     @template.sub_command()
     @checks.has_permissions_level()
+    @checks.cooldown(2, 10, bucket=checks.CooldownType.GUILD)
     async def status(self, ctx):
         """
         Get the status of the currently running loading process
@@ -279,6 +281,7 @@ class TemplatesModule(Module):
             )
         )
     )
+    @checks.cooldown(2, 10, bucket=checks.CooldownType.AUTHOR)
     async def info(self, ctx, name_or_id):
         """
         Get information about a public template

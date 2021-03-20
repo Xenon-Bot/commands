@@ -10,8 +10,13 @@ import grpclib
 import brotli
 import gridfs
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
+import ecies
+import base64
+import hashlib
+import binascii
 
 from .audit_logs import AuditLogType
+from . import encryption
 
 MAX_BACKUPS = 15
 
@@ -163,6 +168,9 @@ class BackupsModule(Module):
         super().__init__(*args, **kwargs)
         self.grid_fs = AsyncIOMotorGridFSBucket(self.bot.db, "backup_chunks", chunk_size_bytes=8000000)
 
+    async def post_setup(self):
+        pass
+
     @Module.command()
     async def backup(self, ctx):
         """
@@ -203,10 +211,10 @@ class BackupsModule(Module):
         backup_id = await self._store_backup(ctx.author.id, data)
 
         await ctx.edit_response(**create_message(
-            f"Successfully **created backup** with the id `{backup_id.upper()}`.\n\n"
+            f"Successfully **created backup** with the id `{backup_id}`.\n\n"
             f"**Usage**\n"
-            f"```/backup info backup_id: {backup_id.upper()}```"
-            f"```/backup load backup_id: {backup_id.upper()}```",
+            f"```/backup info backup_id: {backup_id}```"
+            f"```/backup load backup_id: {backup_id}```",
             f=Format.SUCCESS
         ))
 
@@ -230,7 +238,7 @@ class BackupsModule(Module):
     @checks.bot_has_permissions("administrator")
     @checks.not_in_maintenance
     @checks.cooldown(1, 5 * 60, bucket=checks.CooldownType.GUILD, manual=True)
-    async def load(self, ctx, backup_id: str.lower, options: str.lower = ""):
+    async def load(self, ctx, backup_id, options: str.lower = ""):
         """
         Load a previously created backup on this server
 
@@ -239,7 +247,7 @@ class BackupsModule(Module):
         props, data = await self._retrieve_backup(ctx.author.id, backup_id)
         if data is None:
             await ctx.respond(**create_message(
-                f"You have **no backup** with the id `{backup_id.upper()}`.\n\n"
+                f"You have **no backup** with the id `{backup_id}`.\n\n"
                 f"*Keep in mind that you can only access your own backups.*",
                 f=Format.ERROR
             ))
@@ -345,6 +353,7 @@ class BackupsModule(Module):
     @backup.sub_command()
     @checks.guild_only
     @checks.has_permissions_level(destructive=True)
+    @checks.cooldown(2, 30, bucket=checks.CooldownType.GUILD)
     async def cancel(self, ctx):
         """
         Cancel the currently running loading process on this server
@@ -369,6 +378,7 @@ class BackupsModule(Module):
     @backup.sub_command()
     @checks.guild_only
     @checks.has_permissions_level()
+    @checks.cooldown(2, 10, bucket=checks.CooldownType.GUILD)
     async def status(self, ctx):
         """
         Get the status of the currently running loading process
@@ -398,14 +408,14 @@ class BackupsModule(Module):
         )
     )
     @checks.cooldown(5, 30, bucket=checks.CooldownType.AUTHOR)
-    async def info(self, ctx, backup_id: str.lower):
+    async def info(self, ctx, backup_id):
         """
         Get information about a previously created backup
         """
         props, data = await self._retrieve_backup(ctx.author.id, backup_id)
         if data is None:
             await ctx.respond(**create_message(
-                f"You have **no backup** with the id `{backup_id.upper()}`.\n\n"
+                f"You have **no backup** with the id `{backup_id}`.\n\n"
                 f"*Keep in mind that you can only access your own backups.*",
                 f=Format.ERROR
             ))
@@ -456,7 +466,7 @@ class BackupsModule(Module):
 
     @backup.sub_command()
     @checks.cooldown(2, 10, bucket=checks.CooldownType.AUTHOR)
-    async def list(self, ctx, page: int = 1):
+    async def list(self, ctx, page: int = 1, master_key=None):
         """
         Get a list of all your previously created backups
         """
@@ -470,12 +480,20 @@ class BackupsModule(Module):
             ), ephemeral=True)
             return
 
+        if master_key is not None:
+            try:
+                master_key = base64.b32decode(master_key + "====")
+            except binascii.Error:
+                master_key = None
+
         fields = []
+        contains_encrypted = False
         async for backup in self.bot.db.backups.find(
                 _filter,
                 sort=[("timestamp", pymongo.DESCENDING)],
                 limit=10,
-                skip=(page - 1) * 10
+                skip=(page - 1) * 10,
+                projection=("_id", "timestamp", "interval", "encrypted", "large", "data.id", "data.name", "data.key")
         ):
             properties = []
             if backup.get("interval"):
@@ -487,13 +505,26 @@ class BackupsModule(Module):
             if backup.get("large"):
                 properties.append("🐘")
 
+            backup_id = backup['_id'].upper()
+            if backup.get("encrypted"):
+                backup_id = "encrypted"
+                if master_key is not None:
+                    try:
+                        backup_id = encryption.key_to_id(ecies.decrypt(master_key, backup["data"]["key"]))
+                    except (binascii.Error, ValueError):
+                        contains_encrypted = True
+                else:
+                    contains_encrypted = True
+
             fields.append(dict(
-                name=backup['_id'].upper() + f" • {' '.join(properties)}" * (len(properties) > 0),
+                name=backup_id + f" • {' '.join(properties)}" * (len(properties) > 0),
                 value=f"{backup['data']['name']} (`{datetime_to_string(backup['timestamp'])} UTC`)"
             ))
 
         description = f"Displaying **{(page - 1) * 10 + 1}** - **{min(page * 10, total_count)}** " \
                       f"of **{total_count}** total backups"
+        if contains_encrypted:
+            description += f"\n\n*Some backups are encrypted, supply the master key to see the backup ids.*"
         if total_count > page * 10:
             description += f"\n\nType `/backup list {page + 1}` for the next page"
 
@@ -510,12 +541,20 @@ class BackupsModule(Module):
         )
     )
     @checks.cooldown(5, 30, bucket=checks.CooldownType.AUTHOR)
-    async def delete(self, ctx, backup_id: str.lower):
+    async def delete(self, ctx, backup_id):
         """
         Delete a previously created backup >THIS CAN NOT BE UNDONE<
 
         Get more help on the [wiki](https://wiki.xenon.bot/backups#deleting-a-backup).
         """
+        if len(backup_id) > 20:
+            try:
+                key_bytes = encryption.id_to_key(backup_id)
+            except binascii.Error:
+                pass
+            else:
+                backup_id = base64.b64encode(hashlib.sha3_512(key_bytes).digest()).decode()
+
         result = await self._delete_backup(ctx.author.id, backup_id)
         if result:
             await ctx.respond(**create_message(
@@ -525,7 +564,7 @@ class BackupsModule(Module):
 
         else:
             await ctx.respond(**create_message(
-                f"You have **no backup** with the id `{backup_id.upper()}`.",
+                f"You have **no backup** with the id `{backup_id}`.",
                 f=Format.ERROR
             ))
 
@@ -605,9 +644,20 @@ class BackupsModule(Module):
             ))
 
         else:
+            backups = []
+            async for backup in self.bot.db.backups.find(
+                    {"creator": ctx.author.id, "data.id": ctx.guild_id, "interval": True},
+                    sort=[("timestamp", pymongo.DESCENDING)],
+                    limit=10,
+                    projection=("_id", "timestamp", "encrypted")
+            ):
+                backup_id = "encrypted" if backup.get("encrypted") else backup["_id"].upper()
+                backups.append(f"**{backup_id}** (`{datetime_to_string(backup['timestamp'])} UTC`)")
+
             await ctx.respond(embeds=[{
                 "color": Format.INFO.color,
                 "title": "Backup Interval",
+                "description": "\n".join(backups) + "\n\nType `/backup list` to get a detailed list of backups.\n​",
                 "fields": [
                     {
                         "name": "Interval",
@@ -656,7 +706,8 @@ class BackupsModule(Module):
         await ctx.respond(**create_message(
             "Successful **enabled the backup interval**.\nThe first backup will be created in "
             f"`{timedelta_to_string(interval_td)}` "
-            f"at `{datetime_to_string(now + interval_td)} UTC`.",
+            f"at `{datetime_to_string(now + interval_td)} UTC`.\n\n"
+            f"Type `/backup list` to view your interval backups.",
             f=Format.SUCCESS
         ))
 
@@ -702,9 +753,23 @@ class BackupsModule(Module):
             ))
 
     async def _retrieve_backup(self, creator, backup_id):
-        doc = await self.bot.db.backups.find_one({"_id": backup_id, "creator": creator})
-        if doc is None:
-            return None, None
+        if len(backup_id) > 20:
+            try:
+                key_bytes = encryption.id_to_key(backup_id)
+            except binascii.Error:
+                return None, None
+            identifier = base64.b64encode(hashlib.sha3_512(key_bytes).digest()).decode()
+            doc = await self.bot.db.backups.find_one({"_id": identifier, "creator": creator})
+            if doc is None:
+                return None, None
+
+            _, _, key = encryption.get_symmetric_key(key_bytes, doc["data"]["nonce"])
+            doc["data"]["raw"] = await self.bot.loop.run_in_executor(None, lambda: key.decrypt(doc["data"]["raw"]))
+
+        else:
+            doc = await self.bot.db.backups.find_one({"_id": backup_id.lower(), "creator": creator})
+            if doc is None:
+                return None, None
 
         if doc.get("version") != 2:
             data = convert_v1_to_v2(doc["data"])
@@ -721,10 +786,11 @@ class BackupsModule(Module):
         return doc, data
 
     async def _store_backup(self, creator, data, interval=False):
-        backup_id = unique_id()
         raw = await self.bot.loop.run_in_executor(None, lambda: brotli.compress(data.SerializeToString()))
+        backup_id = unique_id().upper()
+
         doc = {
-            "_id": backup_id,
+            "_id": backup_id.lower(),
             "creator": creator,
             "timestamp": datetime.utcnow(),
             "version": 2,
@@ -737,6 +803,17 @@ class BackupsModule(Module):
                 "raw": raw
             },
         }
+
+        public_key = await encryption.get_public_key(self.bot, creator)
+        if public_key is not None:
+            key_bytes, nonce_bytes, symmetric_key = encryption.get_symmetric_key()
+            backup_id = encryption.key_to_id(key_bytes)
+            doc["_id"] = base64.b64encode(hashlib.sha3_512(key_bytes).digest()).decode()
+            doc["encrypted"] = True
+            doc["data"]["raw"] = await self.bot.loop.run_in_executor(None, lambda: symmetric_key.encrypt(raw))
+            doc["data"]["nonce"] = nonce_bytes
+            doc["data"]["key"] = ecies.encrypt(public_key, key_bytes)
+
         try:
             await self.bot.db.backups.insert_one(doc)
         except pymongo.errors.DocumentTooLarge:

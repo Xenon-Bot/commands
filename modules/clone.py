@@ -45,7 +45,7 @@ class CloneModule(Module):
 
         if len(channels) + len(children) >= 500:
             await ctx.respond(**create_message(
-                "There is **not enough space** to clone channel(s). Each server can only have up to 500 channels.",
+                "There is **not enough space** to clone the channel(s). Each server can only have up to 500 channels.",
                 f=Format.ERROR
             ))
 
@@ -60,10 +60,24 @@ class CloneModule(Module):
                 traceback.print_exc()
                 continue
 
-        await ctx.respond(**create_message(
-            f"Successfully **cloned the channel**: <#{new_channel.id}>.",
-            f=Format.SUCCESS
-        ))
+        if channel.type == ChannelType.GUILD_CATEGORY:
+            if child_channels:
+                await ctx.respond(**create_message(
+                    f"Successfully **cloned the category** <#{new_channel.id}> including all child channels..",
+                    f=Format.SUCCESS
+                ))
+
+            else:
+                await ctx.respond(**create_message(
+                    f"Successfully **cloned the category** <#{new_channel.id}>.",
+                    f=Format.SUCCESS
+                ))
+
+        else:
+            await ctx.respond(**create_message(
+                f"Successfully **cloned the channel** <#{new_channel.id}>.",
+                f=Format.SUCCESS
+            ))
 
     @clone.sub_command(
         extends=dict(

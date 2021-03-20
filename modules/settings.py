@@ -25,14 +25,16 @@ class SettingsModule(Module):
         Show the current settings for this server
         """
         settings = await ctx.bot.db.guilds.find_one({"_id": ctx.guild_id}) or {}
-        permissions_level = settings.get("permissions_level", PermissionLevels.DESTRUCTIVE_OWNER)
+        permissions_level = PermissionLevels(
+            settings.get("permissions_level", PermissionLevels.DESTRUCTIVE_OWNER.value)
+        )
 
         await ctx.respond(embeds=[{
             "title": "Server Settings",
             "color": Format.INFO.color,
             "fields": [
                 {
-                    "name": "Permissions Level",
+                    "name": f"Permissions Level: *{permissions_level.name.replace('_', ' ').title()}*",
                     "value": PERMISSION_DESCRIPTIONS[permissions_level]
                 }
             ]

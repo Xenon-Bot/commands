@@ -1,10 +1,11 @@
 from dbots.cmd import *
+import asyncio
 
 
 class BasicsModule(Module):
     @Module.command()
     @guild_only
-    @checks.has_permissions_level()
+    @checks.is_guild_owner
     async def leave(self, ctx):
         """
         Make the bot leave this server
@@ -114,7 +115,7 @@ class BasicsModule(Module):
         """
         Confirm to an action
         """
-        event = self.bot.confirmations.get(f"{ctx.channel_id}{ctx.author.id}")
+        event = self.bot.confirmations.get(f"{ctx.channel_id}{ctx.author.id}") or asyncio.Event()
         if event is None:
             await ctx.respond(
                 "There is **nothing to confirm to**. Please try running your original command again.",
@@ -125,6 +126,7 @@ class BasicsModule(Module):
         event.set()
         event.clear()
         await ctx.respond(
-            "Your action has been confirmed, you can delete this message.",
-            ephemeral=True
+            "Your action has been confirmed, this message will be deleted."
         )
+        await asyncio.sleep(2)
+        await ctx.delete_response()
