@@ -59,7 +59,7 @@ class AuditLogModule(Module):
         total_count = await self.bot.db.audit_logs.count_documents(_filter)
         if total_count == 0:
             await ctx.respond(**create_message(
-                "You **don't have any backups** yet. Use `/backup create` to create one.",
+                "There **aren't any audit logs** for this server yet.",
                 f=Format.ERROR,
                 embed=False
             ), ephemeral=True)
