@@ -4,7 +4,7 @@ from aiohttp import web
 from concurrent.futures import ThreadPoolExecutor
 
 from bot import Xenon
-from modules import backups, basics, settings, audit_logs, templates, premium, admin, clone, encryption
+from modules import backups, basics, settings, audit_logs, templates, admin, clone, encryption, chatlog, clipboard, sync
 
 
 bot = Xenon(
@@ -18,10 +18,12 @@ modules = {
     settings.SettingsModule,
     audit_logs.AuditLogModule,
     templates.TemplatesModule,
-    premium.PremiumModule,
     admin.AdminModule,
     clone.CloneModule,
-    encryption.EncryptionModule
+    encryption.EncryptionModule,
+    chatlog.ChatlogModule,
+    clipboard.ClipboardModule,
+    sync.SyncModule
 }
 for module in modules:
     bot.load_module(module(bot))
