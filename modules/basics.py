@@ -126,7 +126,6 @@ class BasicsModule(Module):
         event.set()
         event.clear()
         await ctx.respond(
-            "Your action has been confirmed, this message will be deleted."
+            "Your action has been confirmed, you can delete this message.",
+            ephemeral=True
         )
-        await asyncio.sleep(2)
-        await ctx.delete_response()
