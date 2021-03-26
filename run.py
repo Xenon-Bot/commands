@@ -19,8 +19,8 @@ modules = {
     audit_logs.AuditLogModule,
     templates.TemplatesModule,
     admin.AdminModule,
-    clone.CloneModule,
-    encryption.EncryptionModule,
+    # clone.CloneModule,
+    # encryption.EncryptionModule
     chatlog.ChatlogModule,
     clipboard.ClipboardModule,
     sync.SyncModule
@@ -34,6 +34,7 @@ app = web.Application()
 @app.on_startup.append
 async def prepare_bot(*_):
     await bot.setup(env.get("REDIS_URL", "redis://localhost"))
+    # await bot.http.replace_guild_commands(bot.guild_id, [])
     # await bot.push_commands()
 
 

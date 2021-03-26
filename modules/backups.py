@@ -49,21 +49,29 @@ def channel_tree(channels):
     return f"```\n{result}\n```"
 
 
-def warning_list(options):
-    warnings = dict(
-        delete_roles="All **existing roles** will be **deleted**",
-        delete_channels="All **existing channels** will be **deleted**",
-        roles="New roles will be loaded",
-        channels="New channels will be loaded",
-        settings="Server settings will be updated",
-        members="Member roles and nicknames will be loaded",
-        messages="Some messages will be loaded"
-    )
-    return "\n".join(
-        f"- {value}"
-        for option, value in warnings.items()
-        if option in options
-    )
+option_descriptions = dict(
+    delete_roles="All **existing roles** will be **deleted**",
+    delete_channels="All **existing channels** will be **deleted**",
+    roles="New roles will be loaded",
+    channels="New channels will be loaded",
+    settings="Server settings will be updated",
+    members="Member roles and nicknames will be loaded",
+    messages="Some messages will be loaded"
+)
+
+
+def option_list(options, status=None):
+    result = []
+    for option, value in option_descriptions.items():
+        if option in options:
+            if option == status:
+                result.append(f"**- {value.replace('**', '')}**")
+            elif status is not None:
+                result.append(f"- {value.replace('**', '')}")
+            else:
+                result.append(f"- {value}")
+
+    return "\n".join(result)
 
 
 def convert_v1_to_v2(data):
@@ -80,8 +88,8 @@ def convert_v1_to_v2(data):
                     backups_pb2.BackupData.Channel.Overwrite(
                         id=ov["id"],
                         type=ov["type"],
-                        allow=ov["allow"],
-                        deny=ov["deny"]
+                        allow=str(ov["allow"]),
+                        deny=str(ov["deny"])
                     )
                     for ov in channel["permission_overwrites"]
                 ],
@@ -177,7 +185,7 @@ class BackupsModule(Module):
         Create, load and manage your server backups
         """
 
-    @backup.sub_command()
+    # @backup.sub_command()
     @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(1, 30, bucket=checks.CooldownType.GUILD, manual=True)
@@ -227,12 +235,12 @@ class BackupsModule(Module):
             "extra": {}
         })
 
-    @backup.sub_command(
-        extends=dict(
-            backup_id="The id of the previously created backup",
-            options="An optional list of options"
-        )
-    )
+    # @backup.sub_command(
+    #     extends=dict(
+    #         backup_id="The id of the previously created backup",
+    #         options="An optional list of options"
+    #     )
+    # )
     @checks.guild_only
     @checks.has_permissions_level(destructive=True)
     @checks.bot_has_permissions("administrator")
@@ -259,10 +267,23 @@ class BackupsModule(Module):
             options
         )
 
+        role_route = rest.Route("POST", "/guilds/{guild_id}/roles", guild_id=ctx.guild_id)
+        rl = await ctx.bot.http.get_bucket(role_route.bucket)
+        if rl is not None and rl.remaining < len(data.roles) and "roles" in parsed_options:
+            await ctx.respond(**create_message(
+                f"Due to a **Discord limitation** the bot is **not able to load this backup** at the moment.\n\n"
+                f"You have to wait **{timedelta_to_string(timedelta(seconds=rl.delta))}** "
+                f"before you can load a backup containing this many roles again.\n\n"
+                f"You can also load this backup without roles using"
+                f"```/backup load backup_id: {backup_id} options: !delete_roles !roles```",
+                f=Format.ERROR
+            ))
+            return
+
         # Require a confirmation by the user
         await ctx.respond(**create_message(
             "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
-            f"{warning_list(parsed_options)}\n\n"
+            f"{option_list(parsed_options)}\n\n"
             f"Type `/confirm` to confirm this action and continue.",
             f=Format.WARNING
         ))
@@ -273,7 +294,7 @@ class BackupsModule(Module):
             await ctx.delete_response()
             return
 
-        await ctx.count_cooldown()
+        # await ctx.count_cooldown()
 
         # Create audit log entry
         await self.bot.db.audit_logs.insert_one({
@@ -293,12 +314,12 @@ class BackupsModule(Module):
             ids = translator["ids"]
 
         await ctx.edit_response(**create_message(
-            "**The backup is now loading**. Please be patient, this can take a while!\n\n"
+            "**The backup will start loading now**. Please be patient, this can take a while!\n\n"
             "Use `/backup status` to get the current status and `/backup cancel` to cancel the process.\n\n"
             "*This message might not be updated.*",
             f=Format.INFO
         ))
-        await asyncio.sleep(5)
+        await asyncio.sleep(10)
 
         try:
             replies = await self.bot.rpc.backups.Load(backups_pb2.LoadRequest(
@@ -350,7 +371,7 @@ class BackupsModule(Module):
             upsert=True
         )
 
-    @backup.sub_command()
+    # @backup.sub_command()
     @checks.guild_only
     @checks.has_permissions_level(destructive=True)
     @checks.cooldown(2, 30, bucket=checks.CooldownType.GUILD)
@@ -375,7 +396,7 @@ class BackupsModule(Module):
             f=Format.SUCCESS
         ))
 
-    @backup.sub_command()
+    # @backup.sub_command()
     @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(2, 10, bucket=checks.CooldownType.GUILD)
@@ -395,10 +416,20 @@ class BackupsModule(Module):
             else:
                 raise
 
+        minutes = reply.estimated_time_left // 60
+        seconds = reply.estimated_time_left % 60
+        if minutes == 0:
+            etl = "< 1 minute"
+        else:
+            etl = timedelta_to_string(timedelta(minutes=minutes + int(seconds > 0)))
+
+        details = f"\n\n```{reply.details}```" if reply.details else ""
         await ctx.respond(**create_message(
-            f"{reply.status} ...\n\n"
-            f"*Please be patient, this could take a while.*",
-            title="Loader Status",
+            f"Estimated time required for this step: `{etl}`\n\n"
+            f"Type `/backup cancel` to cancel the loading process.\n\n"
+            f"{option_list(reply.options, status=reply.option)}"
+            f"{details}",
+            title="Loading Status",
             f=Format.INFO
         ))
 
@@ -849,7 +880,7 @@ class BackupsModule(Module):
 
         return result.deleted_count + count
 
-    @Module.task(minutes=20)
+    # @Module.task(minutes=20)
     async def interval_task(self):
         tasks = []
         semaphore = asyncio.Semaphore(5)
