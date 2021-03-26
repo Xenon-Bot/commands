@@ -88,8 +88,8 @@ def convert_v1_to_v2(data):
                     backups_pb2.BackupData.Channel.Overwrite(
                         id=ov["id"],
                         type=ov["type"],
-                        allow=ov["allow"],
-                        deny=ov["deny"]
+                        allow=str(ov["allow"]),
+                        deny=str(ov["deny"])
                     )
                     for ov in channel["permission_overwrites"]
                 ],
@@ -294,7 +294,7 @@ class BackupsModule(Module):
             await ctx.delete_response()
             return
 
-        await ctx.count_cooldown()
+        # await ctx.count_cooldown()
 
         # Create audit log entry
         await self.bot.db.audit_logs.insert_one({
@@ -880,7 +880,7 @@ class BackupsModule(Module):
 
         return result.deleted_count + count
 
-    @Module.task(minutes=20)
+    # @Module.task(minutes=20)
     async def interval_task(self):
         tasks = []
         semaphore = asyncio.Semaphore(5)
