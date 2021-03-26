@@ -185,7 +185,7 @@ class BackupsModule(Module):
         Create, load and manage your server backups
         """
 
-    @backup.sub_command()
+    # @backup.sub_command()
     @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(1, 30, bucket=checks.CooldownType.GUILD, manual=True)
@@ -235,12 +235,12 @@ class BackupsModule(Module):
             "extra": {}
         })
 
-    @backup.sub_command(
-        extends=dict(
-            backup_id="The id of the previously created backup",
-            options="An optional list of options"
-        )
-    )
+    # @backup.sub_command(
+    #     extends=dict(
+    #         backup_id="The id of the previously created backup",
+    #         options="An optional list of options"
+    #     )
+    # )
     @checks.guild_only
     @checks.has_permissions_level(destructive=True)
     @checks.bot_has_permissions("administrator")
@@ -371,7 +371,7 @@ class BackupsModule(Module):
             upsert=True
         )
 
-    @backup.sub_command()
+    # @backup.sub_command()
     @checks.guild_only
     @checks.has_permissions_level(destructive=True)
     @checks.cooldown(2, 30, bucket=checks.CooldownType.GUILD)
@@ -396,7 +396,7 @@ class BackupsModule(Module):
             f=Format.SUCCESS
         ))
 
-    @backup.sub_command()
+    # @backup.sub_command()
     @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(2, 10, bucket=checks.CooldownType.GUILD)

@@ -11,13 +11,13 @@ ADMIN_GUILD_ID = env.get("ADMIN_GUILD_ID", "496683369665658880")
 
 
 class AdminModule(Module):
-    @Module.command()
+    # @Module.command()
     async def debug(self, ctx):
         """
         Manage the admin commands for a server
         """
 
-    @debug.sub_command()
+    # @debug.sub_command()
     @guild_only
     @checks.is_bot_owner
     async def enable(self, ctx):
@@ -33,7 +33,7 @@ class AdminModule(Module):
             f=Format.SUCCESS
         ))
 
-    @debug.sub_command()
+    # @debug.sub_command()
     @guild_only
     @checks.is_bot_owner
     async def disable(self, ctx):
@@ -46,7 +46,7 @@ class AdminModule(Module):
             f=Format.SUCCESS
         ))
 
-    @Module.command(visible=False)
+    # @Module.command(visible=False)
     @checks.is_bot_owner
     async def maintenance(self, ctx):
         """
@@ -67,7 +67,7 @@ class AdminModule(Module):
                 f=Format.SUCCESS
             ))
 
-    @Module.command(visible=False)
+    # @Module.command(visible=False)
     @checks.is_bot_owner
     async def eval(self, ctx, expression):
         """
@@ -96,7 +96,7 @@ class AdminModule(Module):
                 f=Format.SUCCESS
             ))
 
-    @Module.command(visible=False)
+    # @Module.command(visible=False)
     @checks.is_bot_owner
     async def exec(self, ctx, snippet):
         """
@@ -135,7 +135,7 @@ class AdminModule(Module):
                 f=Format.SUCCESS
             ))
 
-    @Module.command(visible=False)
+    # @Module.command(visible=False)
     @checks.is_bot_owner
     async def redis(self, ctx, cmd):
         """
@@ -148,7 +148,7 @@ class AdminModule(Module):
             f=Format.SUCCESS
         ))
 
-    @Module.command(visible=False)
+    @Module.command(visible=True)
     @checks.is_bot_owner
     async def error(self, ctx, error_id: str.lower):
         """
@@ -207,7 +207,7 @@ class AdminModule(Module):
             await ctx.respond(embeds=embeds[:3])
             embeds = embeds[3:]
 
-    @Module.command(visible=False)
+    # @Module.command(visible=False)
     @checks.is_bot_owner
     async def blacklist(self, ctx):
         """

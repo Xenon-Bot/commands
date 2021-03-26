@@ -20,8 +20,8 @@ modules = {
     templates.TemplatesModule,
     premium.PremiumModule,
     admin.AdminModule,
-    clone.CloneModule,
-    encryption.EncryptionModule
+    # clone.CloneModule,
+    # encryption.EncryptionModule
 }
 for module in modules:
     bot.load_module(module(bot))
