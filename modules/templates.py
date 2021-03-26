@@ -1,4 +1,4 @@
-from dbots import Role, Channel, rest, Message
+from dbots import *
 from dbots.cmd import *
 import re
 import asyncio
@@ -8,7 +8,7 @@ from dbots.protos import backups_pb2
 import grpclib
 
 from .audit_logs import AuditLogType
-from .backups import warning_list, convert_v1_to_v2, channel_tree, parse_options
+from .backups import option_list, convert_v1_to_v2, channel_tree, parse_options
 
 
 class TemplatesModule(Module):
@@ -122,10 +122,23 @@ class TemplatesModule(Module):
             options
         )
 
+        role_route = rest.Route("POST", "/guilds/{guild_id}/roles", guild_id=ctx.guild_id)
+        rl = await ctx.bot.http.get_bucket(role_route.bucket)
+        if rl is not None and rl.remaining < len(data.roles) and "roles" in parsed_options:
+            await ctx.respond(**create_message(
+                f"Due to a **Discord limitation** the bot is **not able to load this template** at the moment.\n\n"
+                f"You have to wait **{timedelta_to_string(timedelta(seconds=rl.delta))}** "
+                f"before you can load a template containing this many roles again.\n\n"
+                f"You can also load this template without roles using"
+                f"```/template load name_or_id: {name_or_id} options: !delete_roles !roles```",
+                f=Format.ERROR
+            ))
+            return
+
         # Require a confirmation by the user
         await ctx.respond(**create_message(
             "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
-            f"{warning_list(parsed_options)}\n\n"
+            f"{option_list(parsed_options)}\n\n"
             f"Type `/confirm` to confirm this action and continue.",
             f=Format.WARNING
         ))
@@ -256,10 +269,20 @@ class TemplatesModule(Module):
             else:
                 raise
 
+        minutes = reply.estimated_time_left // 60
+        seconds = reply.estimated_time_left % 60
+        if minutes == 0:
+            etl = "< 1 minute"
+        else:
+            etl = timedelta_to_string(timedelta(minutes=minutes + int(seconds > 0)))
+
+        details = f"\n\n```{reply.details}```" if reply.details else ""
         await ctx.respond(**create_message(
-            f"{reply.status} ...\n\n"
-            f"*Please be patient, this could take a while.*",
-            title="Loader Status",
+            f"Estimated time required for this step: `{etl}`\n\n"
+            f"Type `/template cancel` to cancel the loading process.\n\n"
+            f"{option_list(reply.options, status=reply.option)}"
+            f"{details}",
+            title="Loading Status",
             f=Format.INFO
         ))
 
