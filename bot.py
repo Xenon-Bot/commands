@@ -52,6 +52,7 @@ class Xenon(InteractionBot):
             error_id = unique_id()
             await self.redis.setex(f"cmd:errors:{error_id}", 60 * 60 * 24, json.dumps({
                 "command": ctx.command.full_name,
+                "args": {arg.name: arg.value for arg in ctx.args},
                 "timestamp": datetime.utcnow().timestamp(),
                 "author": ctx.author.id,
                 "traceback": tb
