@@ -50,7 +50,7 @@ class AuditLogModule(Module):
     @audit.sub_command()
     @checks.guild_only
     @checks.has_permissions_level()
-    @checks.cooldown(1, 10, bucket=checks.CooldownType.GUILD)
+    @checks.cooldown(2, 10, bucket=checks.CooldownType.GUILD)
     async def logs(self, ctx, page: int = 1):
         """
         Get a list of actions that were recently taken on this server
@@ -82,7 +82,7 @@ class AuditLogModule(Module):
         description = f"Displaying **{(page - 1) * 10 + 1}** - **{min(page * 10, total_count)}** " \
                       f"of **{total_count}** total entries"
         if total_count > page * 10:
-            description += f"\n\nType `/audit logs {page + 1}` for the next page"
+            description += f"\n\nType `/audit logs page: {page + 1}` for the next page"
 
         await ctx.respond(embeds=[dict(
             title="Audit Logs",

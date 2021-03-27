@@ -185,7 +185,7 @@ class BackupsModule(Module):
         Create, load and manage your server backups
         """
 
-    # @backup.sub_command()
+    @backup.sub_command()
     @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(1, 30, bucket=checks.CooldownType.GUILD, manual=True)
@@ -235,12 +235,12 @@ class BackupsModule(Module):
             "extra": {}
         })
 
-    # @backup.sub_command(
-    #     extends=dict(
-    #         backup_id="The id of the previously created backup",
-    #         options="An optional list of options"
-    #     )
-    # )
+    @backup.sub_command(
+        extends=dict(
+            backup_id="The id of the previously created backup",
+            options="An optional list of options"
+        )
+    )
     @checks.guild_only
     @checks.has_permissions_level(destructive=True)
     @checks.bot_has_permissions("administrator")
@@ -291,7 +291,10 @@ class BackupsModule(Module):
         try:
             await self.bot.wait_for_confirmation(ctx, timeout=60)
         except asyncio.TimeoutError:
-            await ctx.delete_response()
+            try:
+                await ctx.delete_response()
+            except rest.HTTPNotFound:
+                pass
             return
 
         # await ctx.count_cooldown()
@@ -338,6 +341,8 @@ class BackupsModule(Module):
                     f=Format.ERROR
                 ))
                 return
+            elif e.status == grpclib.Status.CANCELLED:
+                return
             else:
                 raise
 
@@ -371,7 +376,7 @@ class BackupsModule(Module):
             upsert=True
         )
 
-    # @backup.sub_command()
+    @backup.sub_command()
     @checks.guild_only
     @checks.has_permissions_level(destructive=True)
     @checks.cooldown(2, 30, bucket=checks.CooldownType.GUILD)
@@ -396,7 +401,7 @@ class BackupsModule(Module):
             f=Format.SUCCESS
         ))
 
-    # @backup.sub_command()
+    @backup.sub_command()
     @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(2, 10, bucket=checks.CooldownType.GUILD)
@@ -557,7 +562,7 @@ class BackupsModule(Module):
         if contains_encrypted:
             description += f"\n\n*Some backups are encrypted, supply the master key to see the backup ids.*"
         if total_count > page * 10:
-            description += f"\n\nType `/backup list {page + 1}` for the next page"
+            description += f"\n\nType `/backup list page: {page + 1}` for the next page"
 
         await ctx.respond(embeds=[dict(
             title="Backup List",
@@ -637,7 +642,10 @@ class BackupsModule(Module):
         try:
             await self.bot.wait_for_confirmation(ctx, timeout=60)
         except asyncio.TimeoutError:
-            await ctx.delete_response()
+            try:
+                await ctx.delete_response()
+            except rest.HTTPNotFound:
+                pass
             return
 
         deleted_count = await self._delete_backups(_filter)
