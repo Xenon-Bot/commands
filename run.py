@@ -20,7 +20,7 @@ modules = {
     templates.TemplatesModule,
     premium.PremiumModule,
     admin.AdminModule,
-    # clone.CloneModule,
+    clone.CloneModule,
     # encryption.EncryptionModule
 }
 for module in modules:

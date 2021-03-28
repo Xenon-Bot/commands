@@ -193,7 +193,7 @@ class AdminModule(Module):
                 },
                 {
                     "name": "Args",
-                    "value": "\n".join([f"**{k}**: `{v}`" for k, v in data.get("args", {}).items()]),
+                    "value": "\n".join([f"**{k}**: `{v}`" for k, v in data.get("args", {}).items()]) or "None",
                     "inline": True
                 },
                 {

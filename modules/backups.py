@@ -87,7 +87,7 @@ def convert_v1_to_v2(data):
                 overwrites=[
                     backups_pb2.BackupData.Channel.Overwrite(
                         id=ov["id"],
-                        type=ov["type"],
+                        type=ov["type"] if isinstance(ov["type"], int) else int(ov["type"] != "role"),
                         allow=str(ov["allow"]),
                         deny=str(ov["deny"])
                     )

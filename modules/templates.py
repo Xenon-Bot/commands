@@ -108,7 +108,7 @@ class TemplatesModule(Module):
         """
         template = await self._get_template(name_or_id)
         if template is None:
-            await ctx.respond_with_source(**create_message(
+            await ctx.respond(**create_message(
                 f"Can't find a template with the name, id or url `{name_or_id}`.\n"
                 f"Go to [templates.xenon.bot](https://templates.xenon.bot) to get a list of available templates.",
                 f=Format.ERROR
@@ -315,15 +315,15 @@ class TemplatesModule(Module):
         Get information about a public template
         """
         template = await self._get_template(name_or_id)
-        data = convert_v1_to_v2(template["data"])
         if template is None:
-            await ctx.respond_with_source(**create_message(
-                f"Can't find a template with the name, id or url `{template}`.\n"
+            await ctx.respond(**create_message(
+                f"Can't find a template with the name, id or url `{name_or_id}`.\n"
                 f"Go to [templates.xenon.bot](https://templates.xenon.bot) to get a list of available templates.",
                 f=Format.ERROR
             ))
             return
 
+        data = convert_v1_to_v2(template["data"])
         channel_list = channel_tree(data.channels)
         if len(channel_list) > 1024:
             channel_list = channel_list[:1000] + "\n...\n```"
