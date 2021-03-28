@@ -162,8 +162,9 @@ class AdminModule(Module):
                 if delete:
                     await ctx.bot.redis.delete(key)
 
+            error_list = ", ".join([f"`{key[0]}`" for key in sorted(keys, key=lambda k: k[1], reverse=True)])
             await ctx.respond(**create_message(
-                ", ".join([f"`{key[0]}`" for key in sorted(keys, key=lambda k: k[1], reverse=True)]),
+                error_list or "None in the last 24 hours",
                 title="Command Errors",
                 f=Format.INFO
             ))
