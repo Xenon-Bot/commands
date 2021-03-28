@@ -14,6 +14,8 @@ from dbots.protos import backups_grpc
 import weakref
 import sentry_sdk
 
+from util import *
+
 
 class RpcCollection:
     def __init__(self):
@@ -101,8 +103,8 @@ class Xenon(InteractionBot):
             await self.redis.setex(f"cmd:commands:{block_bucket}", 2, cmd_count + 1)
 
         raw_premium_level = await self.redis.hget("premium:users", payload.author.id) or "0"
-        premium_level = int(raw_premium_level)
-        if premium_level == 0:
+        premium_level = PremiumLevel(int(raw_premium_level))
+        if premium_level == PremiumLevel.NONE:
             return InteractionResponse.message(
                 content="Premium Only",
                 ephemeral=True

@@ -17,17 +17,20 @@ import binascii
 
 from .audit_logs import AuditLogType
 from . import encryption
+from util import *
 
 MAX_BACKUPS = {
-    1: 50,
-    2: 100,
-    3: 250
+    PremiumLevel.NONE: 15,
+    PremiumLevel.ONE: 50,
+    PremiumLevel.TWO: 100,
+    PremiumLevel.THREE: 250
 }
 
 MAX_MESSAGE_COUNT = {
-    1: 50,
-    2: 100,
-    3: 250
+    PremiumLevel.NONE: 0,
+    PremiumLevel.ONE: 50,
+    PremiumLevel.TWO: 100,
+    PremiumLevel.THREE: 250
 }
 
 
@@ -199,7 +202,7 @@ class BackupsModule(Module):
     @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(1, 30, bucket=checks.CooldownType.GUILD, manual=True)
-    async def create(self, ctx, message_count: int = MAX_MESSAGE_COUNT[3]):
+    async def create(self, ctx, message_count: int = 250):
         """
         Create a backup of this server
 
@@ -260,7 +263,7 @@ class BackupsModule(Module):
     @checks.bot_has_permissions("administrator")
     @checks.not_in_maintenance
     @checks.cooldown(1, 5 * 60, bucket=checks.CooldownType.GUILD, manual=True)
-    async def load(self, ctx, backup_id, message_count: int = MAX_MESSAGE_COUNT[3], options: str.lower = ""):
+    async def load(self, ctx, backup_id, message_count: int = 250, options: str.lower = ""):
         """
         Load a previously created backup on this server
 
