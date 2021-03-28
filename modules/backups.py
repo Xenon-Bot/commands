@@ -18,7 +18,17 @@ import binascii
 from .audit_logs import AuditLogType
 from . import encryption
 
-MAX_BACKUPS = 15
+MAX_BACKUPS = {
+    1: 50,
+    2: 100,
+    3: 250
+}
+
+MAX_MESSAGE_COUNT = {
+    1: 50,
+    2: 100,
+    3: 250
+}
 
 
 def channel_tree(channels):
@@ -189,16 +199,20 @@ class BackupsModule(Module):
     @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(1, 30, bucket=checks.CooldownType.GUILD, manual=True)
-    async def create(self, ctx):
+    async def create(self, ctx, message_count: int = MAX_MESSAGE_COUNT[3]):
         """
         Create a backup of this server
 
         Get more help on the [wiki](https://wiki.xenon.bot/backups#creating-a-backup).
         """
+        max_backups = MAX_BACKUPS[ctx.premium_level]
+        max_message_count = MAX_MESSAGE_COUNT[ctx.premium_level]
+        message_count = min(message_count, max_message_count)
+
         backup_count = await ctx.bot.db.backups.count_documents({"creator": ctx.author.id})
-        if backup_count > MAX_BACKUPS:
+        if backup_count > max_backups:
             await ctx.respond(**create_message(
-                f"You have **exceeded the maximum count** of backups. (`{backup_count}/{MAX_BACKUPS}`)\n"
+                f"You have **exceeded the maximum count** of backups. (`{backup_count}/{max_backups}`)\n"
                 f"You need to **delete old backups** with `/backup delete` or **buy "
                 f"[Xenon Premium](https://www.patreon.com/merlinfuchs)** to create new backups.\n\n"
                 f"*Type `/backup list` to view your backups.*",
@@ -206,13 +220,13 @@ class BackupsModule(Module):
             ))
             return
 
-        await ctx.count_cooldown()
+        # await ctx.count_cooldown()
         await ctx.respond(**create_message("Creating backup ...", f=Format.PLEASE_WAIT))
 
         replies = await self.bot.rpc.backups.Create(backups_pb2.CreateRequest(
             guild_id=ctx.guild_id,
-            options=["roles", "channels", "settings"],
-            message_count=0
+            options=["roles", "channels", "settings", "members", "bans", "messages"],
+            message_count=message_count
         ))
 
         data = replies[-1].data
@@ -246,12 +260,15 @@ class BackupsModule(Module):
     @checks.bot_has_permissions("administrator")
     @checks.not_in_maintenance
     @checks.cooldown(1, 5 * 60, bucket=checks.CooldownType.GUILD, manual=True)
-    async def load(self, ctx, backup_id, options: str.lower = ""):
+    async def load(self, ctx, backup_id, message_count: int = MAX_MESSAGE_COUNT[3], options: str.lower = ""):
         """
         Load a previously created backup on this server
 
         Get more help on the [wiki](https://wiki.xenon.bot/backups#loading-a-backup).
         """
+        max_message_count = MAX_MESSAGE_COUNT[ctx.premium_level]
+        message_count = min(message_count, max_message_count)
+
         props, data = await self._retrieve_backup(ctx.author.id, backup_id)
         if data is None:
             await ctx.respond(**create_message(
@@ -262,8 +279,9 @@ class BackupsModule(Module):
             return
 
         parsed_options = parse_options(
-            ("delete_roles", "delete_channels", "roles", "channels", "settings"),
-            ("delete_roles", "delete_channels", "roles", "channels", "update", "settings"),
+            ("delete_roles", "delete_channels", "roles", "channels", "settings", "members", "bans", "messages"),
+            ("delete_roles", "delete_channels", "roles", "channels",
+             "update", "settings", "members", "bans", "messages", "pins"),
             options
         )
 
@@ -328,7 +346,7 @@ class BackupsModule(Module):
             replies = await self.bot.rpc.backups.Load(backups_pb2.LoadRequest(
                 guild_id=ctx.guild_id,
                 options=list(parsed_options),
-                message_count=0,
+                message_count=message_count,
                 data=data,
                 reason="Backup loaded by " + str(ctx.author),
                 ids=ids
