@@ -2,10 +2,16 @@ import asyncio
 from os import environ as env
 from aiohttp import web
 from concurrent.futures import ThreadPoolExecutor
+import sentry_sdk
 
 from bot import Xenon
 from modules import backups, basics, settings, audit_logs, templates, admin, clone, encryption, chatlog, clipboard, sync
 
+if env.get("SENTRY"):
+    sentry_sdk.init(
+        env["SENTRY"],
+        traces_sample_rate=0.1
+    )
 
 bot = Xenon(
     public_key=env.get("PUBLIC_KEY"),
@@ -19,7 +25,7 @@ modules = {
     audit_logs.AuditLogModule,
     templates.TemplatesModule,
     admin.AdminModule,
-    # clone.CloneModule,
+    clone.CloneModule,
     # encryption.EncryptionModule
     chatlog.ChatlogModule,
     clipboard.ClipboardModule,

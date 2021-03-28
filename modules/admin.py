@@ -150,10 +150,30 @@ class AdminModule(Module):
 
     @Module.command(visible=True)
     @checks.is_bot_owner
-    async def error(self, ctx, error_id: str.lower):
+    async def error(self, ctx, error_id: str.lower = None, delete: bool = False):
         """
         Show information about a command error
         """
+        if error_id is None:
+            keys = []
+            for key in await ctx.bot.redis.keys(f"cmd:errors:*"):
+                key = key.decode("utf-8")
+                keys.append((key.split(":")[-1].upper(), await ctx.bot.redis.pttl(key)))
+                if delete:
+                    await ctx.bot.redis.delete(key)
+
+            error_list = ", ".join([f"`{key[0]}`" for key in sorted(keys, key=lambda k: k[1], reverse=True)])
+            await ctx.respond(**create_message(
+                error_list or "None in the last 24 hours",
+                title="Command Errors",
+                f=Format.INFO
+            ))
+            return
+
+        elif error_id == "test":
+            # Just to test if error is working correctly
+            raise ValueError
+
         error = await ctx.bot.redis.get(f"cmd:errors:{error_id}")
         if error is None:
             await ctx.respond(**create_message(
@@ -170,6 +190,11 @@ class AdminModule(Module):
                 {
                     "name": "Command",
                     "value": data["command"],
+                    "inline": True
+                },
+                {
+                    "name": "Args",
+                    "value": "\n".join([f"**{k}**: `{v}`" for k, v in data.get("args", {}).items()]) or "None",
                     "inline": True
                 },
                 {
@@ -206,6 +231,9 @@ class AdminModule(Module):
         while len(embeds) > 0:
             await ctx.respond(embeds=embeds[:3])
             embeds = embeds[3:]
+
+        if delete:
+            await ctx.bot.redis.delete(f"cmd:errors:{error_id}")
 
     # @Module.command(visible=False)
     @checks.is_bot_owner

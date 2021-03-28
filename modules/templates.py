@@ -89,13 +89,13 @@ class TemplatesModule(Module):
             ephemeral=True
         )
 
-    # @template.sub_command(
-    #     extends=dict(
-    #         identifier=dict(
-    #             description="The name, id or url of the template that you want to load"
-    #         )
-    #     )
-    # )
+    @template.sub_command(
+        extends=dict(
+            identifier=dict(
+                description="The name, id or url of the template that you want to load"
+            )
+        )
+    )
     @checks.has_permissions_level(destructive=True)
     @checks.bot_has_permissions("administrator")
     @checks.not_in_maintenance
@@ -107,15 +107,15 @@ class TemplatesModule(Module):
         You can find more help on the [wiki](https://wiki.xenon.bot/templates#loading-a-template).
         """
         template = await self._get_template(name_or_id)
-        data = convert_v1_to_v2(template["data"])
         if template is None:
-            await ctx.respond_with_source(**create_message(
-                f"Can't find a template with the name, id or url `{template}`.\n"
+            await ctx.respond(**create_message(
+                f"Can't find a template with the name, id or url `{name_or_id}`.\n"
                 f"Go to [templates.xenon.bot](https://templates.xenon.bot) to get a list of available templates.",
                 f=Format.ERROR
             ))
             return
 
+        data = convert_v1_to_v2(template["data"])
         parsed_options = parse_options(
             ("delete_roles", "delete_channels", "roles", "channels", "settings"),
             ("delete_roles", "delete_channels", "roles", "channels", "settings"),
@@ -146,7 +146,10 @@ class TemplatesModule(Module):
         try:
             await self.bot.wait_for_confirmation(ctx, timeout=60)
         except asyncio.TimeoutError:
-            await ctx.delete_response()
+            try:
+                await ctx.delete_response()
+            except rest.HTTPNotFound:
+                pass
             return
 
         await ctx.count_cooldown()
@@ -193,6 +196,8 @@ class TemplatesModule(Module):
                     f=Format.ERROR
                 ))
                 return
+            elif e.status == grpclib.Status.CANCELLED:
+                return
             else:
                 raise
 
@@ -226,7 +231,7 @@ class TemplatesModule(Module):
             upsert=True
         )
 
-    # @template.sub_command()
+    @template.sub_command()
     @checks.has_permissions_level(destructive=True)
     @checks.cooldown(2, 30, bucket=checks.CooldownType.GUILD)
     async def cancel(self, ctx):
@@ -250,7 +255,7 @@ class TemplatesModule(Module):
             f=Format.SUCCESS
         ))
 
-    # @template.sub_command()
+    @template.sub_command()
     @checks.has_permissions_level()
     @checks.cooldown(2, 10, bucket=checks.CooldownType.GUILD)
     async def status(self, ctx):
@@ -310,15 +315,15 @@ class TemplatesModule(Module):
         Get information about a public template
         """
         template = await self._get_template(name_or_id)
-        data = convert_v1_to_v2(template["data"])
         if template is None:
-            await ctx.respond_with_source(**create_message(
-                f"Can't find a template with the name, id or url `{template}`.\n"
+            await ctx.respond(**create_message(
+                f"Can't find a template with the name, id or url `{name_or_id}`.\n"
                 f"Go to [templates.xenon.bot](https://templates.xenon.bot) to get a list of available templates.",
                 f=Format.ERROR
             ))
             return
 
+        data = convert_v1_to_v2(template["data"])
         channel_list = channel_tree(data.channels)
         if len(channel_list) > 1024:
             channel_list = channel_list[:1000] + "\n...\n```"

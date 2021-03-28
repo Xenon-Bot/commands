@@ -10,7 +10,7 @@ class BasicsModule(Module):
         """
         Make the bot leave this server
         """
-        await ctx.respond("Bye :(", ephemeral=True)
+        await ctx.respond("Bye :(")
         await ctx.bot.http.leave_guild(ctx.guild_id)
 
     @Module.command(

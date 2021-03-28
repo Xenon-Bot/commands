@@ -1,6 +1,5 @@
 from dbots.cmd import *
 from dbots import *
-import asyncio
 import traceback
 
 
