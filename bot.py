@@ -106,7 +106,11 @@ class Xenon(InteractionBot):
         premium_level = PremiumLevel(int(raw_premium_level))
         if premium_level == PremiumLevel.NONE:
             return InteractionResponse.message(
-                content="Premium Only",
+                content="You **need** to buy **Xenon Premium** to be able to use this bot and its commands.\n\n"
+                        "You can **buy Premium [here](https://patreon.com/merlinfuchs)** and "
+                        "get a full list of features [here](https://wiki.xenon.bot/premium).\n\n\n"
+                        "*If you have already bought Xenon Premium please click "
+                        "[here](https://wiki.xenon.bot/premium#redeem-perks)*.",
                 ephemeral=True
             )
         else:
