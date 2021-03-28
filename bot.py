@@ -100,6 +100,16 @@ class Xenon(InteractionBot):
         else:
             await self.redis.setex(f"cmd:commands:{block_bucket}", 2, cmd_count + 1)
 
+        raw_premium_level = await self.redis.hget("premium:users", payload.author.id) or "0"
+        premium_level = int(raw_premium_level)
+        if premium_level == 0:
+            return InteractionResponse.message(
+                content="Premium Only",
+                ephemeral=True
+            )
+        else:
+            payload.premium_level = premium_level
+
         return await super().execute_command(command, payload, remaining_options)
 
     async def gateway_subscriber(self):
