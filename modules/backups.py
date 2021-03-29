@@ -201,6 +201,7 @@ class BackupsModule(Module):
     @backup.sub_command()
     @checks.guild_only
     @checks.has_permissions_level()
+    @checks.bot_has_permissions("administrator")
     @checks.cooldown(1, 30, bucket=checks.CooldownType.GUILD, manual=True)
     async def create(self, ctx, message_count: int = 250):
         """
