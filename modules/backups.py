@@ -865,7 +865,7 @@ class BackupsModule(Module):
 
     async def _delete_backup(self, creator, backup_id):
         doc = await self.bot.db.backups.find_one_and_delete(
-            {"creator": creator, "_id": backup_id},
+            {"creator": creator, "_id": backup_id.lower()},
             projection=("large", "_id")
         )
         if doc is None:
