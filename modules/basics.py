@@ -45,10 +45,18 @@ class BasicsModule(Module):
 
         if command is None:
             await ctx.respond(
-                "Use this command to get more information about a specific command.\n"
-                "For example: `/help command: backup load`.\n\n"
-                "If you need further help, please check out the [wiki](https://wiki.xenon.bot)"
-                " and join the [support server](https://xenon.bot/discord).",
+                "**Xenon Help**\n\n"
+                "__Useful Commands__\n"
+                "`/backup create` - Create a backup\n"
+                "`/backup load` - Load a previously created backup\n"
+                "`/backup list` - List all your backups\n"
+                "`/backup interval` - Manage automated backups\n"
+                "`/template load` - Load a template from [templates.xenon.bot](https://templates.xenon.bot)\n\n"
+                "Please [visit our wiki](https://wiki.xenon.bot) or join our "
+                "[supper discord](https://xenon.bot/wiki) if you need further help.\n\n"
+                "__Links__\n"
+                "[Website](https://xenon.bot) • [Templates](https://templates.xenon.bot) • "
+                "[Support](https://xenon.bot/discord) • [Twitter](https://twitter.com/xenon_bot)",
                 ephemeral=True
             )
             return
