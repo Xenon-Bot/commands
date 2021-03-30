@@ -232,11 +232,11 @@ class SyncModule(Module):
                 "extra": {"source": _source_id, "target": _target_id, "id": sync_id}
             })
 
-        if "f" in direction:
+        if "from" in direction:
             await ctx.count_cooldown()
             await _create_channel_sync(channel.id, ctx.channel_id)
 
-        if "t" in direction:
+        if "to" in direction:
             await ctx.count_cooldown()
             await _create_channel_sync(ctx.channel_id, channel.id)
 
@@ -293,16 +293,19 @@ class SyncModule(Module):
                 f"You can copy all existing bans using `/copy` and `/paste !* bans`.",
                 f=Format.SUCCESS
             ))
-            await ctx.bot.create_audit_log(
-                AuditLogType.BAN_SYNC_CREATE, [ctx.guild_id, guild.id], ctx.author.id,
-                {"source": _source_id, "target": _target_id, "id": sync_id}
-            )
+            await self.bot.db.audit_logs.insert_one({
+                "type": AuditLogType.BAN_SYNC_CREATE,
+                "timestamp": datetime.utcnow(),
+                "guilds": [ctx.guild_id, guild.id],
+                "user": ctx.author.id,
+                "extra": {"source": _source_id, "target": _target_id, "id": sync_id}
+            })
 
-        if "f" in direction:
+        if "from" in direction:
             await ctx.count_cooldown()
             await _create_ban_sync(guild.id, ctx.guild_id)
 
-        if "t" in direction:
+        if "to" in direction:
             await ctx.count_cooldown()
             await _create_ban_sync(ctx.guild_id, guild.id)
 
@@ -319,7 +322,74 @@ class SyncModule(Module):
     @checks.has_permissions_level()
     @checks.bot_has_permissions("manage_roles")
     @checks.cooldown(1, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
-    async def role(self, ctx, role_a, direction, server_b, role_b):
+    async def role(self, ctx, role_a: CommandOptionType.ROLE, direction, server_b, role_b):
         """
         Sync role assignments for one role to another
         """
+        try:
+            guild = await ctx.bot.http.get_guild(server_b)
+        except (rest.HTTPNotFound, rest.HTTPForbidden):
+            return
+
+        if guild.id != ctx.guild_id:
+            has_admin = self._check_admin_on(guild, ctx.author)
+            if not has_admin:
+                await ctx.respond(**create_message(
+                    f"You need **administrator permissions** in the target server.",
+                    f=Format.ERROR
+                ))
+                return
+
+        role_a = ctx.resolved.roles.get(role_a)
+        if role_a is None:
+            pass
+
+        role_b = guild.get_role(role_b)
+        if role_b is None:
+            pass
+
+        async def _create_role_sync(_source_guild_id, _source_role, _target_guild_id, _target_role):
+            sync_id = utils.unique_id()
+            try:
+                await ctx.bot.db.premium.syncs.insert_one({
+                    "_id": sync_id,
+                    "guilds": [ctx.guild_id, guild.id],
+                    "type": SyncType.ROLE,
+                    "target": _target_role.id,
+                    "target_guild": _target_guild_id,
+                    "source": _source_role.id,
+                    "source_guild": _source_guild_id,
+                    "uses": 0
+                })
+            except pymongo.errors.DuplicateKeyError:
+                await ctx.respond(**create_message(
+                    f"Sync from `{_source_role.name}` (`{_source_role.id}`) "
+                    f"to `{_target_role.name}` (`{_target_role.id}`) "
+                    f"**already exists**.",
+                    f=Format.ERROR
+                ))
+
+            else:
+                await ctx.f_send(**create_message(
+                    f"Successfully **created sync** from `{_source_role.name}` (`{_source_role.id}`) to "
+                    f"`{_target_role.name}` (`{_target_role.id}`) with the id `{sync_id.upper()}`",
+                    f=Format.SUCCESS
+                ))
+                await self.bot.db.audit_logs.insert_one({
+                    "type": AuditLogType.ROLE_SYNC_CREATE,
+                    "timestamp": datetime.utcnow(),
+                    "guilds": [ctx.guild_id, guild.id],
+                    "user": ctx.author.id,
+                    "extra": {"source": _source_role.id, "target": _target_role.id, "id": sync_id}
+                })
+
+        if "from" in direction:
+            await ctx.count_cooldown()
+            await _create_role_sync(guild.id, role_b, ctx.guild_id, role_a)
+
+        if "to" in direction:
+            await ctx.count_cooldown()
+            await _create_role_sync(ctx.guild_id, role_a, guild.id, role_b)
+
+
+

@@ -80,7 +80,7 @@ class Xenon(InteractionBot):
 
     async def execute_command(self, command, payload, remaining_options):
         await self.redis.hincrby("cmd:commands", command.full_name, 1)
-        
+
         raw_premium_level = await self.redis.hget("premium:users", payload.author.id) or "0"
         premium_level = PremiumLevel(int(raw_premium_level))
         if premium_level == PremiumLevel.NONE:
