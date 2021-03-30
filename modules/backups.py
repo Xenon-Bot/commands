@@ -198,7 +198,9 @@ class BackupsModule(Module):
         Create, load and manage your server backups
         """
 
-    @backup.sub_command()
+    @backup.sub_command(extends=dict(
+        message_count="The count of messages to save per channel (default max)"
+    ))
     @checks.guild_only
     @checks.has_permissions_level()
     @checks.bot_has_permissions("administrator")
@@ -255,6 +257,7 @@ class BackupsModule(Module):
 
     @backup.sub_command(extends=dict(
         backup_id="The id of the previously created backup",
+        message_count="The count of messages to load per channel (default max)",
         options="A list of options"
     ))
     @checks.guild_only

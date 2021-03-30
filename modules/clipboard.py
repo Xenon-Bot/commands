@@ -18,7 +18,9 @@ class ClipboardModule(Module):
         Save, load and manage your clipboard (similar to ctrl+c & ctrl+v)
         """
 
-    @clipboard.sub_command()
+    @clipboard.sub_command(extends=dict(
+        message_count="The count of messages to save per channel"
+    ))
     @checks.guild_only
     @checks.has_permissions_level()
     @checks.bot_has_permissions("administrator")
@@ -64,7 +66,10 @@ class ClipboardModule(Module):
             "extra": {}
         })
 
-    @clipboard.sub_command()
+    @clipboard.sub_command(extends=dict(
+        message_count="The count of messages to load per channel",
+        options="A list of options"
+    ))
     @checks.guild_only
     @checks.has_permissions_level(destructive=True)
     @checks.bot_has_permissions("administrator")
@@ -203,7 +208,6 @@ class ClipboardModule(Module):
             },
             upsert=True
         )
-
 
     @clipboard.sub_command()
     @checks.cooldown(5, 30, bucket=checks.CooldownType.AUTHOR)

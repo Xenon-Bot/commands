@@ -29,7 +29,9 @@ class SyncModule(Module):
         Sync events from one server or channel to another
         """
 
-    @sync.sub_command()
+    @sync.sub_command(extends=dict(
+        page="The page to display (default 1)"
+    ))
     @guild_only
     @checks.has_permissions_level()
     async def list(self, ctx, page: int = 1):
@@ -82,7 +84,9 @@ class SyncModule(Module):
             description=f"{description}\n​"
         )])
 
-    @sync.sub_command()
+    @sync.sub_command(extends=dict(
+        sync_id="The id of the previously created sync"
+    ))
     @guild_only
     @checks.has_permissions_level()
     async def delete(self, ctx, sync_id):
@@ -115,15 +119,18 @@ class SyncModule(Module):
 
     @sync.sub_command(extends=dict(
         direction=dict(
-            choices=SYNC_DIRECTIONS
+            choices=SYNC_DIRECTIONS,
+            description="The sync direction"
         ),
+        channel="The second channel for the sync",
         include=dict(
             choices=[
                 ("Only Send", ""),
                 ("Send and Edit", "e"),
                 ("Send and Delete", "d"),
                 ("Send, Edit and Delete", "ed")
-            ]
+            ],
+            description="Events that should be synced"
         )
     ))
     @guild_only
@@ -235,8 +242,10 @@ class SyncModule(Module):
 
     @sync.sub_command(extends=dict(
         direction=dict(
-            choices=SYNC_DIRECTIONS
-        )
+            choices=SYNC_DIRECTIONS,
+            description="The sync direction"
+        ),
+        server_id="The id of the second sever"
     ))
     @guild_only
     @checks.has_permissions_level()
@@ -298,9 +307,13 @@ class SyncModule(Module):
             await _create_ban_sync(ctx.guild_id, guild.id)
 
     @sync.sub_command(extends=dict(
+        role_a="The id of the first role on this server",
         direction=dict(
-            choices=SYNC_DIRECTIONS
-        )
+            choices=SYNC_DIRECTIONS,
+            description="The sync direction"
+        ),
+        server_b="The id of the server that the second role belongs to",
+        role_b="The id of the second role"
     ))
     @guild_only
     @checks.has_permissions_level()
