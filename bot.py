@@ -78,28 +78,6 @@ class Xenon(InteractionBot):
 
     async def execute_command(self, command, payload, remaining_options):
         await self.redis.hincrby("cmd:commands", command.full_name, 1)
-
-        # Global rate limits to prevent abuse
-        block_bucket = payload.guild_id or payload.author.id
-        is_blacklisted = await self.redis.exists(f"cmd:blacklist:{block_bucket}")
-        if is_blacklisted:
-            await self.redis.incr("cmd:commands:blocked")
-            await self.redis.setex(f"cmd:blacklist:{block_bucket}", random.randint(60 * 15, 60 * 60), 1)
-            return InteractionResponse.message(**create_message(
-                "You are being **blocked from using Xenon commands** due to exceeding internal rate limits. "
-                "These rate limits are in place to protect our infrastructure. Please be patient and wait a few hours "
-                "before trying to run another command.",
-                embed=False,
-                f=Format.ERROR
-            ), ephemeral=True)
-
-        cmd_count = int(await self.redis.get(f"cmd:commands:{block_bucket}") or 0)
-        if cmd_count > 5:
-            await self.redis.setex(f"cmd:blacklist:{block_bucket}", random.randint(60 * 15, 60 * 60), 1)
-
-        else:
-            await self.redis.setex(f"cmd:commands:{block_bucket}", 2, cmd_count + 1)
-
         return await super().execute_command(command, payload, remaining_options)
 
     async def gateway_subscriber(self):
