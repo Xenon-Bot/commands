@@ -10,7 +10,7 @@ import traceback
 import sys
 from datetime import datetime
 import grpclib.client
-from dbots.protos import backups_grpc
+from dbots.protos import backups_grpc, chatlogs_grpc
 import weakref
 import sentry_sdk
 
@@ -19,7 +19,9 @@ from util import *
 
 class RpcCollection:
     def __init__(self):
-        self.backups = backups_grpc.BackupsStub(grpclib.client.Channel("localhost", 8081))
+        channel = grpclib.client.Channel("localhost", 8081)
+        self.backups = backups_grpc.BackupsStub(channel)
+        self.chatlogs = chatlogs_grpc.ChatlogsStub(channel)
 
 
 class Xenon(InteractionBot):

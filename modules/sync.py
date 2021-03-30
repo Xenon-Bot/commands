@@ -43,9 +43,8 @@ class SyncModule(Module):
         if total_count == 0:
             await ctx.respond(**create_message(
                 "There **aren't any syncs** attached to this server yet.",
-                f=Format.ERROR,
-                embed=False
-            ), ephemeral=True)
+                f=Format.INFO
+            ))
             return
 
         fields = []
