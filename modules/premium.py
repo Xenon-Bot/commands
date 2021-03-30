@@ -8,6 +8,18 @@ PREMIUM_ONLY_TEXT = "This command can **only** be used with **Xenon Premium**.\n
 
 class PremiumModule(Module):
     @Module.command()
+    async def premium(self, ctx):
+        """
+        Get information about Xenon Premium
+        """
+        await ctx.respond(
+            "**Xenon Premium** is the **paid version** of Xenon.\n"
+            "You can buy it on [patreon](https://www.patreon.com/merlinfuchs) "
+            "and find a detailed list of perks [here](https://wiki.xenon.bot/premium)",
+            ephemeral=True
+        )
+
+    @Module.command()
     async def chatlog(self, ctx):
         """
         Save & load messages from individual channels

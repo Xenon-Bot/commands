@@ -1,4 +1,5 @@
 from dbots.cmd import *
+from dbots import *
 import asyncio
 
 
@@ -10,7 +11,22 @@ class BasicsModule(Module):
         """
         Make the bot leave this server
         """
-        await ctx.respond("Bye :(")
+        # Require a confirmation by the user
+        await ctx.respond(
+            "Are you sure that you want Xenon to leave? :(\n\n"
+            f"Type `/confirm` to confirm this action."
+        )
+
+        try:
+            await self.bot.wait_for_confirmation(ctx, timeout=30)
+        except asyncio.TimeoutError:
+            try:
+                await ctx.delete_response()
+            except rest.HTTPNotFound:
+                pass
+            return
+
+        await ctx.edit_response("Bye :(")
         await ctx.bot.http.leave_guild(ctx.guild_id)
 
     @Module.command(
@@ -55,7 +71,7 @@ class BasicsModule(Module):
                 "Please [visit our wiki](https://wiki.xenon.bot) or join our "
                 "[supper discord](https://xenon.bot/wiki) if you need further help.\n\n"
                 "__Links__\n"
-                "[Website](https://xenon.bot) • [Templates](https://templates.xenon.bot) • "
+                "[Wiki](https://wiki.xenon.bot) • [Templates](https://templates.xenon.bot) • "
                 "[Support](https://xenon.bot/discord) • [Twitter](https://twitter.com/xenon_bot)",
                 ephemeral=True
             )
@@ -84,7 +100,11 @@ class BasicsModule(Module):
         """
         Ping? Pong!
         """
-        await ctx.respond(f"Pong! <:stonks:763794050343370793>", ephemeral=True)
+        await ctx.respond(
+            f"Pong! <:stonks:763794050343370793>\n\n"
+            f"Xenon is fully operational and is waiting for your commands.",
+            ephemeral=True
+        )
 
     @Module.command()
     async def invite(self, ctx):
@@ -103,18 +123,6 @@ class BasicsModule(Module):
         """
         await ctx.respond(
             f"Click [here](https://xenon.bot/discord) to join the support server.",
-            ephemeral=True
-        )
-
-    @Module.command()
-    async def premium(self, ctx):
-        """
-        Get information about Xenon Premium
-        """
-        await ctx.respond(
-            "**Xenon Premium** is the **paid version** of Xenon.\n"
-            "You can buy it on [patreon](https://www.patreon.com/merlinfuchs) "
-            "and find a detailed list of perks [here](https://wiki.xenon.bot/premium)",
             ephemeral=True
         )
 
