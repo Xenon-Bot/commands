@@ -193,6 +193,13 @@ class TemplatesModule(Module):
                     f=Format.ERROR
                 ))
                 return
+            elif e.status == grpclib.Status.NOT_FOUND:
+                await ctx.edit_response(**create_message(
+                    f"Xenon doesn't seem to be on this server, "
+                    f"please click [here](https://xenon.bot/invite) to invite it again.",
+                    f=Format.ERROR
+                ))
+                return
             elif e.status == grpclib.Status.CANCELLED:
                 return
             else:

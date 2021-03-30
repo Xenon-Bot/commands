@@ -209,11 +209,22 @@ class BackupsModule(Module):
         await ctx.count_cooldown()
         await ctx.respond(**create_message("Creating backup ...", f=Format.PLEASE_WAIT))
 
-        replies = await self.bot.rpc.backups.Create(backups_pb2.CreateRequest(
-            guild_id=ctx.guild_id,
-            options=["roles", "channels", "settings"],
-            message_count=0
-        ))
+        try:
+            replies = await self.bot.rpc.backups.Create(backups_pb2.CreateRequest(
+                guild_id=ctx.guild_id,
+                options=["roles", "channels", "settings"],
+                message_count=0
+            ))
+        except GRPCError as e:
+            if e.status == grpclib.Status.NOT_FOUND:
+                await ctx.edit_response(**create_message(
+                    f"Xenon doesn't seem to be on this server, "
+                    f"please click [here](https://xenon.bot/invite) to invite it again.",
+                    f=Format.ERROR
+                ))
+                return
+            else:
+                raise
 
         data = replies[-1].data
         backup_id = await self._store_backup(ctx.author.id, data)
@@ -336,6 +347,13 @@ class BackupsModule(Module):
                 await ctx.edit_response(**create_message(
                     f"There is **already a loading process running** on this server.\n"
                     f"Please wait for it to finish or use `/backup cancel` to stop it.",
+                    f=Format.ERROR
+                ))
+                return
+            elif e.status == grpclib.Status.NOT_FOUND:
+                await ctx.edit_response(**create_message(
+                    f"Xenon doesn't seem to be on this server, "
+                    f"please click [here](https://xenon.bot/invite) to invite it again.",
                     f=Format.ERROR
                 ))
                 return
