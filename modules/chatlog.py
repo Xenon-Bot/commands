@@ -1,5 +1,14 @@
 from dbots.cmd import *
 
+from util import PremiumLevel
+
+MAX_MESSAGE_COUNT = {
+    PremiumLevel.NONE: 0,
+    PremiumLevel.ONE: 250,
+    PremiumLevel.TWO: 500,
+    PremiumLevel.THREE: 1000
+}
+
 
 class ChatlogModule(Module):
     @Module.command()
