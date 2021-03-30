@@ -342,11 +342,17 @@ class SyncModule(Module):
 
         role_a = ctx.resolved.roles.get(role_a)
         if role_a is None:
-            pass
+            await ctx.respod(**create_message(
+                f"**Can't find role_a** on this server.",
+                f=Format.ERROR
+            ))
 
         role_b = guild.get_role(role_b)
         if role_b is None:
-            pass
+            await ctx.respod(**create_message(
+                f"**Can't find role_b** on server_b.",
+                f=Format.ERROR
+            ))
 
         async def _create_role_sync(_source_guild_id, _source_role, _target_guild_id, _target_role):
             sync_id = utils.unique_id()
