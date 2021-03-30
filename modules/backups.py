@@ -253,12 +253,10 @@ class BackupsModule(Module):
             "extra": {}
         })
 
-    @backup.sub_command(
-        extends=dict(
-            backup_id="The id of the previously created backup",
-            options="An optional list of options"
-        )
-    )
+    @backup.sub_command(extends=dict(
+        backup_id="The id of the previously created backup",
+        options="A list of options"
+    ))
     @checks.guild_only
     @checks.has_permissions_level(destructive=True)
     @checks.bot_has_permissions("administrator")
@@ -319,7 +317,7 @@ class BackupsModule(Module):
                 pass
             return
 
-        # await ctx.count_cooldown()
+        await ctx.count_cooldown()
 
         # Create audit log entry
         await self.bot.db.audit_logs.insert_one({
@@ -522,7 +520,10 @@ class BackupsModule(Module):
             ]
         }])
 
-    @backup.sub_command()
+    @backup.sub_command(extends=dict(
+        page="The page to display (default 1)",
+        master_kay="The master key (only for encrypted backups)"
+    ))
     @checks.cooldown(2, 10, bucket=checks.CooldownType.AUTHOR)
     async def list(self, ctx, page: int = 1, master_key=None):
         """

@@ -89,13 +89,10 @@ class TemplatesModule(Module):
             ephemeral=True
         )
 
-    @template.sub_command(
-        extends=dict(
-            identifier=dict(
-                description="The name, id or url of the template that you want to load"
-            )
-        )
-    )
+    @template.sub_command(extends=dict(
+        name_or_id="The name, id or url of the template that you want to load",
+        options="A list of options"
+    ))
     @checks.has_permissions_level(destructive=True)
     @checks.bot_has_permissions("administrator")
     @checks.not_in_maintenance
@@ -302,13 +299,9 @@ class TemplatesModule(Module):
             ephemeral=True
         )
 
-    @template.sub_command(
-        extends=dict(
-            identifier=dict(
-                description="The name, id or url of the template that you want to load"
-            )
-        )
-    )
+    @template.sub_command(extends=dict(
+        name_or_id="The name, id or url of the template that you want to load"
+    ))
     @checks.cooldown(2, 10, bucket=checks.CooldownType.AUTHOR)
     async def info(self, ctx, name_or_id):
         """

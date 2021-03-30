@@ -47,7 +47,9 @@ class AuditLogModule(Module):
         Get a list of actions that were recently taken on this server
         """
 
-    @audit.sub_command()
+    @audit.sub_command(extends=dict(
+        page="The page to display (default 1)"
+    ))
     @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(2, 10, bucket=checks.CooldownType.GUILD)
