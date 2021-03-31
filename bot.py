@@ -4,7 +4,6 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import aioredis
 import json
 from os import environ as env
-import random
 import asyncio
 import traceback
 import sys

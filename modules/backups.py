@@ -530,9 +530,8 @@ class BackupsModule(Module):
         if total_count == 0:
             await ctx.respond(**create_message(
                 "You **don't have any backups** yet. Use `/backup create` to create one.",
-                f=Format.ERROR,
-                embed=False
-            ), ephemeral=True)
+                f=Format.INFO
+            ))
             return
 
         if master_key is not None:
