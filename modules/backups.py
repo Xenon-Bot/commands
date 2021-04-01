@@ -44,7 +44,8 @@ def channel_tree(channels):
             ChannelType.GUILD_VOICE: "<",
             ChannelType.GUILD_CATEGORY: "\n˅",
             ChannelType.GUILD_NEWS: "!",
-            ChannelType.GUILD_STORE: "$"
+            ChannelType.GUILD_STORE: "$",
+            ChannelType.GUILD_STAGE: ")"
         }
         return f"{' ' * spacing}{prefixes.get(channel.type, '')} {channel.name}\n"
 
@@ -555,9 +556,8 @@ class BackupsModule(Module):
         if total_count == 0:
             await ctx.respond(**create_message(
                 "You **don't have any backups** yet. Use `/backup create` to create one.",
-                f=Format.ERROR,
-                embed=False
-            ), ephemeral=True)
+                f=Format.INFO
+            ))
             return
 
         if master_key is not None:

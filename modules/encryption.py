@@ -35,7 +35,7 @@ class EncryptionModule(Module):
         Manage backup and chatlog encryption
         """
 
-    @encryption.sub_command(visible=False)
+    @encryption.sub_command(visible=False, ephemeral=True)
     @checks.cooldown(1, 60, bucket=checks.CooldownType.AUTHOR)
     async def enable(self, ctx):
         """
@@ -48,8 +48,9 @@ class EncryptionModule(Module):
             await ctx.respond(**create_message(
                 "**Encryption** for new backups and chatlogs has been **enabled** again. "
                 "Your master key stays the same.",
-                f=Format.SUCCESS
-            ))
+                f=Format.SUCCESS,
+                embed=False
+            ), ephemeral=True)
             return
 
         key = generate_key()
@@ -70,7 +71,7 @@ class EncryptionModule(Module):
             ephemeral=True
         )
 
-    @encryption.sub_command()
+    @encryption.sub_command(ephemeral=True)
     @checks.cooldown(1, 60, bucket=checks.CooldownType.AUTHOR)
     async def disable(self, ctx):
         """
@@ -83,18 +84,20 @@ class EncryptionModule(Module):
         if result.matched_count == 0:
             await ctx.respond(**create_message(
                 "Encryption was never enabled. Use `/encryption enable` to enable it.",
-                f=Format.ERROR
-            ))
+                f=Format.ERROR,
+                embed=False
+            ), ephemeral=True)
 
         else:
             await ctx.respond(**create_message(
                 "**Encryption** for new backups and chatlogs **has been disabled**. "
                 "Use `/encryption enable` to enable it again.\n"
                 "**This does not reset your master key**",
-                f=Format.SUCCESS
-            ))
+                f=Format.SUCCESS,
+                embed=False
+            ), ephemeral=True)
 
-    @encryption.sub_command()
+    @encryption.sub_command(ephemeral=True)
     @checks.cooldown(1, 2 * 60, bucket=checks.CooldownType.AUTHOR, manual=True)
     async def reset(self, ctx):
         """
@@ -104,8 +107,9 @@ class EncryptionModule(Module):
         await ctx.respond(**create_message(
             "**Hey, be careful!** This action will delete all you encrypted backups and **can not be undone**:\n\n"
             f"Type `/confirm` to confirm this action and continue.",
-            f=Format.WARNING
-        ))
+            f=Format.WARNING,
+            embed=False
+        ), ephemeral=True)
 
         try:
             await self.bot.wait_for_confirmation(ctx, timeout=60)
@@ -119,5 +123,6 @@ class EncryptionModule(Module):
         await ctx.edit_response(**create_message(
             "Encryption has been disabled, your master key has been reset and all your encrypted have been deleted.\n\n"
             "Use `/encryption enable` to enable encryption again and get a new master key.",
-            f=Format.SUCCESS
-        ))
+            f=Format.SUCCESS,
+            embed=False
+        ), ephemeral=True)
