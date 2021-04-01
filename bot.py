@@ -68,12 +68,15 @@ class Xenon(InteractionBot):
                 "author": ctx.author.id,
                 "traceback": tb
             }))
-            await ctx.respond(**create_message(
-                "An unexpected error occurred. Please report this on the "
-                "[Support Server](https://xenon.bot/discord).\n\n"
-                f"**Error Code**: `{error_id.upper()}`",
-                f=Format.ERROR
-            ))
+            try:
+                await ctx.respond(**create_message(
+                    "An unexpected error occurred. Please report this on the "
+                    "[Support Server](https://xenon.bot/discord).\n\n"
+                    f"**Error Code**: `{error_id.upper()}`",
+                    f=Format.ERROR
+                ))
+            except rest.HTTPException:
+                pass
 
     async def execute_command(self, command, payload, remaining_options):
         await self.redis.hincrby("cmd:commands", command.full_name, 1)
