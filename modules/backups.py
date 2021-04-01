@@ -31,7 +31,8 @@ def channel_tree(channels):
             ChannelType.GUILD_VOICE: "<",
             ChannelType.GUILD_CATEGORY: "\n˅",
             ChannelType.GUILD_NEWS: "!",
-            ChannelType.GUILD_STORE: "$"
+            ChannelType.GUILD_STORE: "$",
+            ChannelType.GUILD_STAGE: ")"
         }
         return f"{' ' * spacing}{prefixes.get(channel.type, '')} {channel.name}\n"
 

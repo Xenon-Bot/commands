@@ -93,6 +93,7 @@ class TemplatesModule(Module):
         name_or_id="The name, id or url of the template that you want to load",
         options="A list of options"
     ))
+    @checks.guild_only
     @checks.has_permissions_level(destructive=True)
     @checks.bot_has_permissions("administrator")
     @checks.not_in_maintenance
@@ -236,6 +237,7 @@ class TemplatesModule(Module):
         )
 
     @template.sub_command()
+    @checks.guild_only
     @checks.has_permissions_level(destructive=True)
     @checks.cooldown(2, 30, bucket=checks.CooldownType.GUILD)
     async def cancel(self, ctx):
@@ -260,6 +262,7 @@ class TemplatesModule(Module):
         ))
 
     @template.sub_command()
+    @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(2, 10, bucket=checks.CooldownType.GUILD)
     async def status(self, ctx):
