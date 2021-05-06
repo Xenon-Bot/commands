@@ -358,6 +358,13 @@ class BackupsModule(Module):
                     f=Format.ERROR
                 ))
                 return
+            elif e.status == grpclib.Status.RESOURCE_EXHAUSTED:
+                await ctx.edit_response(**create_message(
+                    f"Xenon is currently experiencing increased load and can't process your request, "
+                    f"please **try again in a few minutes**.",
+                    f=Format.ERROR
+                ))
+                return
             elif e.status == grpclib.Status.CANCELLED:
                 return
             else:
@@ -372,26 +379,27 @@ class BackupsModule(Module):
             pass
 
         # Save ids for later use and recovery
-        await ctx.bot.db.id_translators.update_one(
-            {
-                "target_id": ctx.guild_id,
-                "source_id": data.id,
-            },
-            {
-                "$set": {
+        if len(replies[-1].ids) > 0:
+            await ctx.bot.db.id_translators.update_one(
+                {
                     "target_id": ctx.guild_id,
                     "source_id": data.id,
-                    **{
-                        f"ids.{s}": t
-                        for s, t in replies[-1].ids.items()
+                },
+                {
+                    "$set": {
+                        "target_id": ctx.guild_id,
+                        "source_id": data.id,
+                        **{
+                            f"ids.{s}": t
+                            for s, t in replies[-1].ids.items()
+                        }
+                    },
+                    "$addToSet": {
+                        "loaders": ctx.author.id
                     }
                 },
-                "$addToSet": {
-                    "loaders": ctx.author.id
-                }
-            },
-            upsert=True
-        )
+                upsert=True
+            )
 
     @backup.sub_command()
     @checks.guild_only
@@ -751,6 +759,7 @@ class BackupsModule(Module):
         """
         interval_td = string_to_timedelta(interval)
         hours = max(interval_td.total_seconds() // 3600, 24)
+        interval_td = timedelta(hours=hours)
 
         now = datetime.utcnow()
         await ctx.bot.db.intervals.update_one({"guild": ctx.guild_id, "user": ctx.author.id}, {"$set": {
@@ -814,7 +823,7 @@ class BackupsModule(Module):
         if len(backup_id) > 20:
             try:
                 key_bytes = encryption.id_to_key(backup_id)
-            except binascii.Error:
+            except (binascii.Error, ValueError):
                 return None, None
             identifier = base64.b64encode(hashlib.sha3_512(key_bytes).digest()).decode()
             doc = await self.bot.db.backups.find_one({"_id": identifier, "creator": creator})

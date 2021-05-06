@@ -201,6 +201,13 @@ class TemplatesModule(Module):
                     f=Format.ERROR
                 ))
                 return
+            elif e.status == grpclib.Status.RESOURCE_EXHAUSTED:
+                await ctx.edit_response(**create_message(
+                    f"Xenon is currently experiencing increased load and can't process your request, "
+                    f"please **try again in a few minutes**.",
+                    f=Format.ERROR
+                ))
+                return
             elif e.status == grpclib.Status.CANCELLED:
                 return
             else:
@@ -353,7 +360,7 @@ class TemplatesModule(Module):
                 },
                 {
                     "name": "Description",
-                    "value": f"{template['description'][:1000]}",
+                    "value": f"{template.get('description', '')[:1000]}",
                     "inline": False
                 },
                 {
