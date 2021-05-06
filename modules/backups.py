@@ -207,7 +207,7 @@ class BackupsModule(Module):
             ))
             return
 
-        await ctx.count_cooldown()
+        # await ctx.count_cooldown()
         await ctx.respond(**create_message("Creating backup ...", f=Format.PLEASE_WAIT))
 
         try:
@@ -525,23 +525,15 @@ class BackupsModule(Module):
             ]
         }])
 
-    @backup.sub_command(extends=dict(
-        page="The page to display (default 1)",
-        master_kay="The master key (only for encrypted backups)"
-    ))
-    @checks.cooldown(2, 10, bucket=checks.CooldownType.AUTHOR)
-    async def list(self, ctx, page: int = 1, master_key=None):
-        """
-        Get a list of all your previously created backups
-        """
-        _filter = {"creator": ctx.author.id}
+    async def _backup_list_message(self, user_id, page, master_key=None):
+        _filter = {"creator": user_id}
+        page = max(page, 1)
         total_count = await self.bot.db.backups.count_documents(_filter)
         if total_count == 0:
-            await ctx.respond(**create_message(
+            return create_message(
                 "You **don't have any backups** yet. Use `/backup create` to create one.",
                 f=Format.INFO
-            ))
-            return
+            )
 
         if master_key is not None:
             try:
@@ -591,12 +583,38 @@ class BackupsModule(Module):
         if total_count > page * 10:
             description += f"\n\nType `/backup list page: {page + 1}` for the next page"
 
-        await ctx.respond(embeds=[dict(
-            title="Backup List",
-            fields=fields,
-            color=Format.INFO.color,
-            description=f"{description}\n​"
-        )])
+        return dict(
+            embeds=[dict(
+                title="Backup List",
+                fields=fields,
+                color=Format.INFO.color,
+                description=f"{description}\n​",
+            )],
+            components=[ActionRow(
+                Button(label="Previous", custom_id=f"backup_list", args=[str(page - 1)],
+                       disabled=page <= 1 or master_key),
+                Button(label="Next", custom_id=f"backup_list", args=[str(page + 1)],
+                       disabled=total_count <= page * 10 or master_key)
+            )],
+            ephemeral=True
+        )
+
+    @backup.sub_command(extends=dict(
+        page="The page to display (default 1)",
+        master_kay="The master key (only for encrypted backups)"
+    ))
+    @checks.cooldown(2, 10, bucket=checks.CooldownType.AUTHOR)
+    async def list(self, ctx, page: int = 1, master_key=None):
+        """
+        Get a list of all your previously created backups
+        """
+        data = await self._backup_list_message(ctx.author.id, page, master_key)
+        await ctx.respond(**data)
+
+    @Module.button(name="backup_list")
+    async def list_page(self, ctx, page):
+        data = await self._backup_list_message(ctx.author.id, int(page))
+        await ctx.update(**data)
 
     @backup.sub_command(
         extends=dict(
