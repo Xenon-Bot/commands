@@ -591,9 +591,9 @@ class BackupsModule(Module):
                 description=f"{description}\n​",
             )],
             components=[ActionRow(
-                Button(label="Previous", custom_id=f"backup_list", args=[str(page - 1)],
+                Button(label="Previous Page", custom_id=f"backup_list", args=[str(page - 1)],
                        disabled=page <= 1 or master_key),
-                Button(label="Next", custom_id=f"backup_list", args=[str(page + 1)],
+                Button(label="Next Page", custom_id=f"backup_list", args=[str(page + 1)],
                        disabled=total_count <= page * 10 or master_key)
             )],
             ephemeral=True
