@@ -14,6 +14,7 @@ import ecies
 import base64
 import hashlib
 import binascii
+import json
 
 from .audit_logs import AuditLogType
 from . import encryption
@@ -207,7 +208,7 @@ class BackupsModule(Module):
             ))
             return
 
-        # await ctx.count_cooldown()
+        await ctx.count_cooldown()
         await ctx.respond(**create_message("Creating backup ...", f=Format.PLEASE_WAIT))
 
         try:
@@ -290,24 +291,43 @@ class BackupsModule(Module):
             ))
             return
 
+        redis_key = f"backup_load:{unique_id()}"
+        await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps({
+            "backup_id": backup_id,
+            "options": list(parsed_options)
+        }))
+
         # Require a confirmation by the user
         await ctx.respond(**create_message(
             "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
-            f"{option_list(parsed_options)}\n\n"
-            f"Type `/confirm` to confirm this action and continue.",
+            f"{option_list(parsed_options)}",
             f=Format.WARNING
-        ))
+        ), components=[ActionRow(
+            Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id="backup_load_confirm", args=[redis_key]),
+            Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="backup_load_cancel")
+        )], ephemeral=True)
+        await ctx.count_cooldown()
 
-        try:
-            await self.bot.wait_for_confirmation(ctx, timeout=60)
-        except asyncio.TimeoutError:
-            try:
-                await ctx.delete_response()
-            except rest.HTTPNotFound:
-                pass
+    @Module.button(name="backup_load_cancel")
+    async def load_cancel(self, ctx):
+        await ctx.update(**create_message(
+            "The loading process has been **cancelled**.\n\n"
+            "Use `/backup load` to try again.",
+            f=Format.INFO
+        ), ephemeral=True)
+
+    @Module.button(name="backup_load_confirm")
+    async def load_confirm(self, ctx, redis_key):
+        scope = await ctx.bot.redis.get(redis_key)
+        if scope is None:
             return
 
-        await ctx.count_cooldown()
+        scope = json.loads(scope)
+        backup_id, options = scope["backup_id"], scope["options"]
+
+        props, data = await self._retrieve_backup(ctx.author.id, backup_id)
+        if data is None:
+            return
 
         # Create audit log entry
         await self.bot.db.audit_logs.insert_one({
@@ -337,7 +357,7 @@ class BackupsModule(Module):
         try:
             replies = await self.bot.rpc.backups.Load(backups_pb2.LoadRequest(
                 guild_id=ctx.guild_id,
-                options=list(parsed_options),
+                options=list(options),
                 message_count=0,
                 data=data,
                 reason="Backup loaded by " + str(ctx.author),
@@ -678,28 +698,53 @@ class BackupsModule(Module):
             ))
             return
 
+        redis_key = f"backup_purge:{unique_id()}"
+        await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps({
+            "older_than": older_than,
+            "server_name": server_name
+        }))
+
         await ctx.respond(**create_message(
-            f"Are you sure that you want to delete **{delete_count}** of **{total_count}** total backups?\n\n"
-            "Type `/confirm` to confirm this action and continue.",
+            f"Are you sure that you want to delete **{delete_count}** of **{total_count}** total backups?",
             f=Format.WARNING
-        ))
-
-        try:
-            await self.bot.wait_for_confirmation(ctx, timeout=60)
-        except asyncio.TimeoutError:
-            try:
-                await ctx.delete_response()
-            except rest.HTTPNotFound:
-                pass
-            return
-
-        deleted_count = await self._delete_backups(_filter)
+        ), components=[ActionRow(
+            Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id="backup_purge_confirm", args=[redis_key]),
+            Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="backup_purge_cancel")
+        )], ephemeral=True)
 
         await ctx.count_cooldown()
+
+    @Module.button(name="backup_purge_confirm")
+    async def purge_confirm(self, ctx, redis_key):
+        scope = await ctx.bot.redis.get(redis_key)
+        if scope is None:
+            return
+
+        scope = json.loads(scope)
+        older_than, server_name = scope["older_than"], scope["server_name"]
+
+        td = string_to_timedelta(older_than)
+        _filter = {
+            "creator": ctx.author.id,
+            "timestamp": {"$lte": datetime.utcnow() - td}
+        }
+        if server_name:
+            _filter["data.name"] = server_name.strip()
+
+        total_count = await self.bot.db.backups.count_documents({"creator": ctx.author.id})
+        deleted_count = await self._delete_backups(_filter)
         await ctx.edit_response(**create_message(
             f"Successfully deleted **{deleted_count}** of **{total_count}** total backups.",
             f=Format.SUCCESS
         ))
+
+    @Module.button(name="backup_purge_cancel")
+    async def purge_cancel(self, ctx):
+        await ctx.update(**create_message(
+            "Your backups have **not** been **deleted**.\n\n"
+            "Use `/backup purge` to try again.",
+            f=Format.INFO
+        ), ephemeral=True)
 
     @backup.sub_command_group()
     async def interval(self, ctx):
