@@ -105,22 +105,28 @@ class EncryptionModule(Module):
         """
         # Require a confirmation by the user
         await ctx.respond(**create_message(
-            "**Hey, be careful!** This action will delete all you encrypted backups and **can not be undone**:\n\n"
-            f"Type `/confirm` to confirm this action and continue.",
+            "**Hey, be careful!** This action will delete all you encrypted backups and **can not be undone**.",
             f=Format.WARNING,
             embed=False
+        ), components=[ActionRow(
+            Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id="encryption_reset_confirm"),
+            Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="encryption_reset_cancel")
+        )], ephemeral=True)
+        await ctx.count_cooldown()
+
+    @Module.button(name="encryption_reset_cancel")
+    async def reset_cancel(self, ctx):
+        await ctx.update(**create_message(
+            "Your master key has **not been reset**.\n\n"
+            "Use `/encryption reset` to try again.",
+            f=Format.INFO
         ), ephemeral=True)
 
-        try:
-            await self.bot.wait_for_confirmation(ctx, timeout=60)
-        except asyncio.TimeoutError:
-            await ctx.delete_response()
-            return
-
-        await ctx.count_cooldown()
+    @Module.button(name="encryption_reset_confirm")
+    async def reset_confirm(self, ctx):
         await ctx.bot.db.backups.delete_many({"creator": ctx.author.id, "encrypted": True})
         await ctx.bot.db.encryption.delete_one({"_id": ctx.author.id})
-        await ctx.edit_response(**create_message(
+        await ctx.update(**create_message(
             "Encryption has been disabled, your master key has been reset and all your encrypted have been deleted.\n\n"
             "Use `/encryption enable` to enable encryption again and get a new master key.",
             f=Format.SUCCESS,
