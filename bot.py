@@ -30,20 +30,11 @@ class Xenon(InteractionBot):
 
         self.rpc = RpcCollection()
 
-        self.confirmations = weakref.WeakValueDictionary()
         self.button(self._delete_button, name="delete")
 
     async def _delete_button(self, ctx):
         ctx.defer()
         await ctx.delete_response()
-
-    async def wait_for_confirmation(self, ctx, timeout=30):
-        key = f"{ctx.channel_id}{ctx.author.id}"
-        event = self.confirmations.get(key)
-        if event is None:
-            event = self.confirmations[key] = asyncio.Event()
-
-        await asyncio.wait_for(event.wait(), timeout=timeout)
 
     async def on_command_error(self, ctx, e):
         if isinstance(e, asyncio.CancelledError):
