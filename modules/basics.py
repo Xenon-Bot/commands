@@ -91,7 +91,6 @@ class BasicsModule(Module):
         else:
             await ctx.respond(**create_message(
                 f"Unknown command: `{command}`",
-                embed=False,
                 f=Format.ERROR
             ), ephemeral=True)
 
