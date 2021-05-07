@@ -324,19 +324,6 @@ class BackupsModule(Module):
             ))
             return
 
-        role_route = rest.Route("POST", "/guilds/{guild_id}/roles", guild_id=ctx.guild_id)
-        rl = await ctx.bot.http.get_bucket(role_route.bucket)
-        if rl is not None and rl.remaining < len(data.roles) and "roles" in options:
-            await ctx.update(**create_message(
-                f"Due to a **Discord limitation** the bot is **not able to load this backup** at the moment.\n\n"
-                f"You have to wait **{timedelta_to_string(timedelta(seconds=rl.delta))}** "
-                f"before you can load a backup containing this many roles again.\n\n"
-                f"You can also load this backup without roles using"
-                f"```/backup load backup_id: {backup_id} options: !delete_roles !roles```",
-                f=Format.ERROR
-            ))
-            return
-
         # Create audit log entry
         await self.bot.db.audit_logs.insert_one({
             "type": AuditLogType.BACKUP_LOAD,
@@ -390,6 +377,16 @@ class BackupsModule(Module):
                 await ctx.update(**create_message(
                     f"Xenon is currently experiencing increased load and can't process your request, "
                     f"please **try again in a few minutes**.",
+                    f=Format.ERROR
+                ))
+                return
+            elif e.status == grpclib.Status.OUT_OF_RANGE:
+                await ctx.update(**create_message(
+                    f"Due to a **Discord limitation** the bot is **not able to load this backup** at the moment.\n\n"
+                    f"You have to wait **{timedelta_to_string(timedelta(seconds=int(e.message)))}** "
+                    f"before you can load a backup containing this many roles again.\n\n"
+                    f"You can also load this backup without roles using"
+                    f"```/backup load backup_id: {backup_id} options: !delete_roles !roles```",
                     f=Format.ERROR
                 ))
                 return

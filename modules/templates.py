@@ -172,19 +172,6 @@ class TemplatesModule(Module):
 
         data = convert_v1_to_v2(template["data"])
 
-        role_route = rest.Route("POST", "/guilds/{guild_id}/roles", guild_id=ctx.guild_id)
-        rl = await ctx.bot.http.get_bucket(role_route.bucket)
-        if rl is not None and rl.remaining < len(data.roles) and "roles" in options:
-            await ctx.respond(**create_message(
-                f"Due to a **Discord limitation** the bot is **not able to load this template** at the moment.\n\n"
-                f"You have to wait **{timedelta_to_string(timedelta(seconds=rl.delta))}** "
-                f"before you can load a template containing this many roles again.\n\n"
-                f"You can also load this template without roles using"
-                f"```/template load name_or_id: {name_or_id} options: !delete_roles !roles```",
-                f=Format.ERROR
-            ))
-            return
-
         # Create audit log entry
         await self.bot.db.audit_logs.insert_one({
             "type": AuditLogType.TEMPLATE_LOAD,
@@ -238,6 +225,16 @@ class TemplatesModule(Module):
                 await ctx.update(**create_message(
                     f"Xenon is currently experiencing increased load and can't process your request, "
                     f"please **try again in a few minutes**.",
+                    f=Format.ERROR
+                ))
+                return
+            elif e.status == grpclib.Status.OUT_OF_RANGE:
+                await ctx.respond(**create_message(
+                    f"Due to a **Discord limitation** the bot is **not able to load this template** at the moment.\n\n"
+                    f"You have to wait **{timedelta_to_string(timedelta(seconds=int(e.message)))}** "
+                    f"before you can load a template containing this many roles again.\n\n"
+                    f"You can also load this template without roles using"
+                    f"```/template load name_or_id: {name_or_id} options: !delete_roles !roles```",
                     f=Format.ERROR
                 ))
                 return
