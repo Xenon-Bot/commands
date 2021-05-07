@@ -143,14 +143,14 @@ def convert_v1_to_v2(data):
             )
             for ban in data.get("bans", [])
         ],
-        members=[
-            backups_pb2.BackupData.Member(
-                id=member["id"],
+        members={
+            member["id"]: backups_pb2.BackupData.Member(
+                # id=member["id"],
                 nick=member["nick"],
                 roles=member["roles"]
             )
             for member in data.get("members", [])
-        ]
+        }
     )
 
 
