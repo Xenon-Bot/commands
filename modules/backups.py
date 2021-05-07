@@ -100,7 +100,7 @@ def convert_v1_to_v2(data):
                 topic=channel.get("topic"),
                 nsfw=channel.get("nsfw"),
                 rate_limit_per_user=channel.get("rate_limit_per_user"),
-                messages=[],  # TODO: convert messages
+                # messages=[],  # TODO: convert messages
 
                 bitrate=channel.get("bitrate"),
                 user_limit=channel.get("user_limit")
@@ -263,13 +263,13 @@ class BackupsModule(Module):
 
         Get more help on the [wiki](https://wiki.xenon.bot/backups#loading-a-backup).
         """
-        props, data = await self._retrieve_backup(ctx.author.id, backup_id)
-        if data is None:
+        exists = await self._backup_exists(ctx.author.id, backup_id)
+        if not exists:
             await ctx.respond(**create_message(
                 f"You have **no backup** with the id `{backup_id}`.\n\n"
                 f"*Keep in mind that you can only access your own backups.*",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         parsed_options = parse_options(
@@ -277,19 +277,6 @@ class BackupsModule(Module):
             ("delete_roles", "delete_channels", "roles", "channels", "update", "settings"),
             options
         )
-
-        role_route = rest.Route("POST", "/guilds/{guild_id}/roles", guild_id=ctx.guild_id)
-        rl = await ctx.bot.http.get_bucket(role_route.bucket)
-        if rl is not None and rl.remaining < len(data.roles) and "roles" in parsed_options:
-            await ctx.respond(**create_message(
-                f"Due to a **Discord limitation** the bot is **not able to load this backup** at the moment.\n\n"
-                f"You have to wait **{timedelta_to_string(timedelta(seconds=rl.delta))}** "
-                f"before you can load a backup containing this many roles again.\n\n"
-                f"You can also load this backup without roles using"
-                f"```/backup load backup_id: {backup_id} options: !delete_roles !roles```",
-                f=Format.ERROR
-            ))
-            return
 
         redis_key = f"backup_load:{unique_id()}"
         await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps({
@@ -320,6 +307,10 @@ class BackupsModule(Module):
     async def load_confirm(self, ctx, redis_key):
         scope = await ctx.bot.redis.get(redis_key)
         if scope is None:
+            await ctx.update(**create_message(
+                "You were too slow, try again with `/backup load`",
+                f=Format.ERROR
+            ))
             return
 
         scope = json.loads(scope)
@@ -327,6 +318,23 @@ class BackupsModule(Module):
 
         props, data = await self._retrieve_backup(ctx.author.id, backup_id)
         if data is None:
+            await ctx.update(**create_message(
+                "Something went wrong, try again with `/backup load`",
+                f=Format.ERROR
+            ))
+            return
+
+        role_route = rest.Route("POST", "/guilds/{guild_id}/roles", guild_id=ctx.guild_id)
+        rl = await ctx.bot.http.get_bucket(role_route.bucket)
+        if rl is not None and rl.remaining < len(data.roles) and "roles" in options:
+            await ctx.update(**create_message(
+                f"Due to a **Discord limitation** the bot is **not able to load this backup** at the moment.\n\n"
+                f"You have to wait **{timedelta_to_string(timedelta(seconds=rl.delta))}** "
+                f"before you can load a backup containing this many roles again.\n\n"
+                f"You can also load this backup without roles using"
+                f"```/backup load backup_id: {backup_id} options: !delete_roles !roles```",
+                f=Format.ERROR
+            ))
             return
 
         # Create audit log entry
@@ -346,13 +354,13 @@ class BackupsModule(Module):
         if translator is not None:
             ids = translator["ids"]
 
-        await ctx.edit_response(**create_message(
+        await ctx.update(**create_message(
             "**The backup will start loading now**. Please be patient, this can take a while!\n\n"
             "Use `/backup status` to get the current status and `/backup cancel` to cancel the process.\n\n"
             "*This message might not be updated.*",
             f=Format.INFO
         ))
-        await asyncio.sleep(10)
+        await asyncio.sleep(5)
 
         try:
             replies = await self.bot.rpc.backups.Load(backups_pb2.LoadRequest(
@@ -365,21 +373,21 @@ class BackupsModule(Module):
             ))
         except GRPCError as e:
             if e.status == grpclib.Status.ALREADY_EXISTS:
-                await ctx.edit_response(**create_message(
+                await ctx.update(**create_message(
                     f"There is **already a loading process running** on this server.\n"
                     f"Please wait for it to finish or use `/backup cancel` to stop it.",
                     f=Format.ERROR
                 ))
                 return
             elif e.status == grpclib.Status.NOT_FOUND:
-                await ctx.edit_response(**create_message(
+                await ctx.update(**create_message(
                     f"Xenon doesn't seem to be on this server, "
                     f"please click [here](https://xenon.bot/invite) to invite it again.",
                     f=Format.ERROR
                 ))
                 return
             elif e.status == grpclib.Status.RESOURCE_EXHAUSTED:
-                await ctx.edit_response(**create_message(
+                await ctx.update(**create_message(
                     f"Xenon is currently experiencing increased load and can't process your request, "
                     f"please **try again in a few minutes**.",
                     f=Format.ERROR
@@ -391,7 +399,7 @@ class BackupsModule(Module):
                 raise
 
         try:
-            await ctx.edit_response(**create_message(
+            await ctx.update(**create_message(
                 f"Successfully **loaded the backup**.",
                 f=Format.SUCCESS
             ))
@@ -600,7 +608,7 @@ class BackupsModule(Module):
                       f"of **{total_count}** total backups"
         if contains_encrypted:
             description += f"\n\n*Some backups are encrypted, supply the master key to see the backup ids.*"
-        if total_count > page * 10:
+        if total_count > page * 10 and master_key:
             description += f"\n\nType `/backup list page: {page + 1}` for the next page"
 
         return dict(
@@ -718,6 +726,10 @@ class BackupsModule(Module):
     async def purge_confirm(self, ctx, redis_key):
         scope = await ctx.bot.redis.get(redis_key)
         if scope is None:
+            await ctx.update(**create_message(
+                "You were too slow, try again with `/backup purge`",
+                f=Format.ERROR
+            ))
             return
 
         scope = json.loads(scope)
@@ -733,7 +745,7 @@ class BackupsModule(Module):
 
         total_count = await self.bot.db.backups.count_documents({"creator": ctx.author.id})
         deleted_count = await self._delete_backups(_filter)
-        await ctx.edit_response(**create_message(
+        await ctx.update(**create_message(
             f"Successfully deleted **{deleted_count}** of **{total_count}** total backups.",
             f=Format.SUCCESS
         ))
@@ -881,6 +893,20 @@ class BackupsModule(Module):
                 f"Your backup interval is not enabled for this server.",
                 f=Format.ERROR
             ))
+
+    async def _backup_exists(self, creator, backup_id):
+        if len(backup_id) > 20:
+            try:
+                key_bytes = encryption.id_to_key(backup_id)
+            except (binascii.Error, ValueError):
+                return False
+
+            identifier = base64.b64encode(hashlib.sha3_512(key_bytes).digest()).decode()
+            doc = await self.bot.db.backups.find_one({"_id": identifier, "creator": creator}, projection=())
+            return doc is not None
+
+        doc = await self.bot.db.backups.find_one({"_id": backup_id.lower(), "creator": creator}, projection=())
+        return doc is not None
 
     async def _retrieve_backup(self, creator, backup_id):
         if len(backup_id) > 20:
