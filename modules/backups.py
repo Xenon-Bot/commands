@@ -99,7 +99,7 @@ def convert_v1_to_v2(data):
                 topic=channel.get("topic"),
                 nsfw=channel.get("nsfw"),
                 rate_limit_per_user=channel.get("rate_limit_per_user"),
-                messages=[],  # TODO: convert messages
+                # messages=[],  # TODO: convert messages
 
                 bitrate=channel.get("bitrate"),
                 user_limit=channel.get("user_limit")
@@ -142,14 +142,13 @@ def convert_v1_to_v2(data):
             )
             for ban in data.get("bans", [])
         ],
-        members=[
-            backups_pb2.BackupData.Member(
-                id=member["id"],
+        members={
+            member["id"]: backups_pb2.BackupData.Member(
                 nick=member["nick"],
                 roles=member["roles"]
             )
             for member in data.get("members", [])
-        ]
+        }
     )
 
 
