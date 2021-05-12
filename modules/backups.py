@@ -61,16 +61,29 @@ option_descriptions = dict(
 )
 
 
-def option_list(options, status=None):
+def option_list(options):
     result = []
     for option, value in option_descriptions.items():
         if option in options:
-            if option == status:
-                result.append(f"**- {value.replace('**', '')}**")
-            elif status is not None:
-                result.append(f"- {value.replace('**', '')}")
-            else:
-                result.append(f"- {value}")
+            result.append(f"- {value}")
+
+    return "\n".join(result)
+
+
+def option_status_list(options):
+    result = []
+    for option, value in option_descriptions.items():
+        status = options.get(option)
+        if status is None:
+            continue
+
+        text = value.replace("**", "")
+        if status.state == backups_pb2.LoadStatus.State.RUNNING:
+            result.append(f"**- {text}**")
+        elif status.state == backups_pb2.LoadStatus.State.RATE_LIMIT:
+            result.append(f"**- {text}**")
+        else:
+            result.append(f"- {text}")
 
     return "\n".join(result)
 
@@ -206,7 +219,7 @@ class BackupsModule(Module):
             ))
             return
 
-        await ctx.count_cooldown()
+        # await ctx.count_cooldown()
         await ctx.respond(**create_message("Creating backup ...", f=Format.PLEASE_WAIT))
 
         try:
@@ -306,7 +319,7 @@ class BackupsModule(Module):
                 pass
             return
 
-        await ctx.count_cooldown()
+        # await ctx.count_cooldown()
 
         # Create audit log entry
         await self.bot.db.audit_logs.insert_one({
@@ -323,7 +336,7 @@ class BackupsModule(Module):
             "source_id": data.id
         })
         if translator is not None:
-            ids = translator["ids"]
+            ids = translator.get("ids", {})
 
         await ctx.edit_response(**create_message(
             "**The backup will start loading now**. Please be patient, this can take a while!\n\n"
@@ -445,18 +458,24 @@ class BackupsModule(Module):
             else:
                 raise
 
-        minutes = reply.estimated_time_left // 60
-        seconds = reply.estimated_time_left % 60
+        estimated_time_left = sum([
+            o.estimated_time_left
+            for o in reply.options.values()
+            if o.state != backups_pb2.LoadStatus.State.WAITING
+        ])
+
+        minutes = estimated_time_left // 60
+        seconds = estimated_time_left % 60
         if minutes == 0:
             etl = "< 1 minute"
         else:
             etl = timedelta_to_string(timedelta(minutes=minutes + int(seconds > 0)))
 
-        details = f"\n\n```{reply.details}```" if reply.details else ""
+        details = "\n\n" + "\n".join([f"```{o.details}```" for o in reply.options.values() if o.details])
         await ctx.respond(**create_message(
             f"Estimated time required for this step: `{etl}`\n\n"
             f"Type `/backup cancel` to cancel the loading process.\n\n"
-            f"{option_list(reply.options, status=reply.option)}"
+            f"{option_status_list(reply.options)}"
             f"{details}",
             title="Loading Status",
             f=Format.INFO
