@@ -74,16 +74,29 @@ option_descriptions = dict(
 )
 
 
-def option_list(options, status=None):
+def option_list(options):
     result = []
     for option, value in option_descriptions.items():
         if option in options:
-            if option == status:
-                result.append(f"**- {value.replace('**', '')}**")
-            elif status is not None:
-                result.append(f"- {value.replace('**', '')}")
-            else:
-                result.append(f"- {value}")
+            result.append(f"- {value}")
+
+    return "\n".join(result)
+
+
+def option_status_list(options):
+    result = []
+    for option, value in option_descriptions.items():
+        status = options.get(option)
+        if status is None:
+            continue
+
+        text = value.replace("**", "")
+        if status.state == backups_pb2.LoadStatus.State.RUNNING:
+            result.append(f"**- {text}**")
+        elif status.state == backups_pb2.LoadStatus.State.RATE_LIMIT:
+            result.append(f"**- {text}**")
+        else:
+            result.append(f"- {text}")
 
     return "\n".join(result)
 
@@ -112,7 +125,7 @@ def convert_v1_to_v2(data):
                 topic=channel.get("topic"),
                 nsfw=channel.get("nsfw"),
                 rate_limit_per_user=channel.get("rate_limit_per_user"),
-                messages=[],  # TODO: convert messages
+                # messages=[],  # TODO: convert messages
 
                 bitrate=channel.get("bitrate"),
                 user_limit=channel.get("user_limit")
@@ -155,14 +168,13 @@ def convert_v1_to_v2(data):
             )
             for ban in data.get("bans", [])
         ],
-        members=[
-            backups_pb2.BackupData.Member(
-                id=member["id"],
+        members={
+            member["id"]: backups_pb2.BackupData.Member(
                 nick=member["nick"],
                 roles=member["roles"]
             )
             for member in data.get("members", [])
-        ]
+        }
     )
 
 
@@ -332,7 +344,7 @@ class BackupsModule(Module):
                 pass
             return
 
-        await ctx.count_cooldown()
+        # await ctx.count_cooldown()
 
         # Create audit log entry
         await self.bot.db.audit_logs.insert_one({
@@ -349,7 +361,7 @@ class BackupsModule(Module):
             "source_id": data.id
         })
         if translator is not None:
-            ids = translator["ids"]
+            ids = translator.get("ids", {})
 
         await ctx.edit_response(**create_message(
             "**The backup will start loading now**. Please be patient, this can take a while!\n\n"
@@ -383,6 +395,13 @@ class BackupsModule(Module):
                     f=Format.ERROR
                 ))
                 return
+            elif e.status == grpclib.Status.RESOURCE_EXHAUSTED:
+                await ctx.edit_response(**create_message(
+                    f"Xenon is currently experiencing increased load and can't process your request, "
+                    f"please **try again in a few minutes**.",
+                    f=Format.ERROR
+                ))
+                return
             elif e.status == grpclib.Status.CANCELLED:
                 return
             else:
@@ -397,26 +416,27 @@ class BackupsModule(Module):
             pass
 
         # Save ids for later use and recovery
-        await ctx.bot.db.id_translators.update_one(
-            {
-                "target_id": ctx.guild_id,
-                "source_id": data.id,
-            },
-            {
-                "$set": {
+        if len(replies[-1].ids) > 0:
+            await ctx.bot.db.id_translators.update_one(
+                {
                     "target_id": ctx.guild_id,
                     "source_id": data.id,
-                    **{
-                        f"ids.{s}": t
-                        for s, t in replies[-1].ids.items()
+                },
+                {
+                    "$set": {
+                        "target_id": ctx.guild_id,
+                        "source_id": data.id,
+                        **{
+                            f"ids.{s}": t
+                            for s, t in replies[-1].ids.items()
+                        }
+                    },
+                    "$addToSet": {
+                        "loaders": ctx.author.id
                     }
                 },
-                "$addToSet": {
-                    "loaders": ctx.author.id
-                }
-            },
-            upsert=True
-        )
+                upsert=True
+            )
 
     @backup.sub_command()
     @checks.guild_only
@@ -463,18 +483,24 @@ class BackupsModule(Module):
             else:
                 raise
 
-        minutes = reply.estimated_time_left // 60
-        seconds = reply.estimated_time_left % 60
+        estimated_time_left = sum([
+            o.estimated_time_left
+            for o in reply.options.values()
+            if o.state != backups_pb2.LoadStatus.State.WAITING
+        ])
+
+        minutes = estimated_time_left // 60
+        seconds = estimated_time_left % 60
         if minutes == 0:
             etl = "< 1 minute"
         else:
             etl = timedelta_to_string(timedelta(minutes=minutes + int(seconds > 0)))
 
-        details = f"\n\n```{reply.details}```" if reply.details else ""
+        details = "\n\n" + "\n".join([f"```{o.details}```" for o in reply.options.values() if o.details])
         await ctx.respond(**create_message(
             f"Estimated time required for this step: `{etl}`\n\n"
             f"Type `/backup cancel` to cancel the loading process.\n\n"
-            f"{option_list(reply.options, status=reply.option)}"
+            f"{option_status_list(reply.options)}"
             f"{details}",
             title="Loading Status",
             f=Format.INFO
@@ -776,6 +802,7 @@ class BackupsModule(Module):
         """
         interval_td = string_to_timedelta(interval)
         hours = max(interval_td.total_seconds() // 3600, 24)
+        interval_td = timedelta(hours=hours)
 
         now = datetime.utcnow()
         await ctx.bot.db.intervals.update_one({"guild": ctx.guild_id, "user": ctx.author.id}, {"$set": {
@@ -839,7 +866,7 @@ class BackupsModule(Module):
         if len(backup_id) > 20:
             try:
                 key_bytes = encryption.id_to_key(backup_id)
-            except binascii.Error:
+            except (binascii.Error, ValueError):
                 return None, None
             identifier = base64.b64encode(hashlib.sha3_512(key_bytes).digest()).decode()
             doc = await self.bot.db.backups.find_one({"_id": identifier, "creator": creator})

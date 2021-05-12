@@ -50,16 +50,17 @@ class Xenon(InteractionBot):
             raise e
 
         else:
-            with sentry_sdk.push_scope() as scope:
-                scope.set_tag("command", ctx.command.full_name)
-                scope.set_tag("guild_id", ctx.guild_id)
-                scope.set_tag("args", ", ".join([f"{arg.name}: {arg.value}" for arg in ctx.args]))
-                scope.set_user({
-                    "id": ctx.author.id,
-                    "name": ctx.author.name,
-                    "discriminator": ctx.author.discriminator}
-                )
-                sentry_sdk.capture_exception(e)
+            if not isinstance(e, rest.HTTPException):
+                with sentry_sdk.push_scope() as scope:
+                    scope.set_tag("command", ctx.command.full_name)
+                    scope.set_tag("guild_id", ctx.guild_id)
+                    scope.set_tag("args", ", ".join([f"{arg.name}: {arg.value}" for arg in ctx.args]))
+                    scope.set_user({
+                        "id": ctx.author.id,
+                        "name": ctx.author.name,
+                        "discriminator": ctx.author.discriminator}
+                    )
+                    sentry_sdk.capture_exception(e)
 
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             print("Command Error:\n", tb, file=sys.stderr)
