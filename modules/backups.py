@@ -319,7 +319,7 @@ class BackupsModule(Module):
                 pass
             return
 
-        # await ctx.count_cooldown()
+        await ctx.count_cooldown()
 
         # Create audit log entry
         await self.bot.db.audit_logs.insert_one({
