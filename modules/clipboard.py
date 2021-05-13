@@ -31,7 +31,10 @@ class ClipboardModule(Module):
         """
         max_message_count = MAX_MESSAGE_COUNT[ctx.premium_level]
         message_count = min(message_count, max_message_count)
-        await ctx.respond(**create_message("Saving to clipboard ...", f=Format.PLEASE_WAIT))
+        await ctx.respond(**create_message(
+            "Saving to clipboard ...",
+            f=Format.PLEASE_WAIT
+        ), ephemeral=True)
 
         replies = await self.bot.rpc.backups.Create(backups_pb2.CreateRequest(
             guild_id=ctx.guild_id,
@@ -82,7 +85,7 @@ class ClipboardModule(Module):
             await ctx.respond(**create_message(
                 "There is **nothing on your clipboard**. Type `/clipboard copy` to save a server to your clipboard.",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         data = backups_pb2.BackupData()
@@ -105,7 +108,7 @@ class ClipboardModule(Module):
                 f"You can also load this server without roles using"
                 f"```/clipboard paste options: !delete_roles !roles```",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
             # Require a confirmation by the user
@@ -125,7 +128,7 @@ class ClipboardModule(Module):
                 pass
             return
 
-        # await ctx.count_cooldown()
+        await ctx.count_cooldown()
 
         # Create audit log entry
         await self.bot.db.audit_logs.insert_one({
@@ -215,7 +218,7 @@ class ClipboardModule(Module):
             await ctx.respond(**create_message(
                 "There is **nothing on your clipboard**. Type `/clipboard copy` to save a server to your clipboard.",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         data = backups_pb2.BackupData()
@@ -246,7 +249,7 @@ class ClipboardModule(Module):
                     "inline": True
                 },
             ]
-        }])
+        }], ephemeral=True)
 
     @clipboard.sub_command()
     @checks.cooldown(5, 30, bucket=checks.CooldownType.AUTHOR)
@@ -258,4 +261,4 @@ class ClipboardModule(Module):
         await ctx.respond(**create_message(
             "You **clipboard has been cleared**.",
             f=Format.SUCCESS
-        ))
+        ), ephemeral=True)

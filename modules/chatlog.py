@@ -87,11 +87,14 @@ class ChatlogModule(Module):
                 f"[Xenon Premium](https://www.patreon.com/merlinfuchs)** to create new backups.\n\n"
                 f"*Type `/backup list` to view your backups.*",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         # await ctx.count_cooldown()
-        await ctx.respond(**create_message("Creating chatlog ...", f=Format.PLEASE_WAIT))
+        await ctx.respond(**create_message(
+            "Creating chatlog ...",
+            f=Format.PLEASE_WAIT
+        ), ephemeral=True)
 
         reply = await self.bot.rpc.chatlogs.Create(chatlogs_pb2.CreateRequest(
             channel_id=ctx.channel_id,
@@ -149,7 +152,7 @@ class ChatlogModule(Module):
             await ctx.respond(**create_message(
                 "You **don't have any chatlogs** yet. Use `/chatlog create` to create one.",
                 f=Format.INFO
-            ))
+            ), ephemeral=True)
             return
 
         if master_key is not None:
@@ -199,7 +202,7 @@ class ChatlogModule(Module):
             fields=fields,
             color=Format.INFO.color,
             description=f"{description}\n​"
-        )])
+        )], ephemeral=True)
 
     @chatlog.sub_command()
     async def delete(self, ctx, chatlog_id):
@@ -211,12 +214,12 @@ class ChatlogModule(Module):
             await ctx.respond(**create_message(
                 f"You have **no chatlog** with the id `{chatlog_id}`.",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
         else:
             await ctx.respond(**create_message(
                 f"Successfully **deleted the chatlog**.",
                 f=Format.SUCCESS
-            ))
+            ), ephemeral=True)
 
     @chatlog.sub_command(extends=dict(
         older_than="Only backups that are older than this will be deleted (e.g. 24h)"
@@ -238,14 +241,14 @@ class ChatlogModule(Module):
             await ctx.respond(**create_message(
                 "There are **no chatlogs** to delete.",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         await ctx.respond(**create_message(
             f"Are you sure that you want to delete **{delete_count}** of **{total_count}** total chatlogs?\n\n"
             "Type `/confirm` to confirm this action and continue.",
             f=Format.WARNING
-        ))
+        ), ephemeral=True)
 
         try:
             await self.bot.wait_for_confirmation(ctx, timeout=60)

@@ -44,7 +44,7 @@ class SyncModule(Module):
             await ctx.respond(**create_message(
                 "There **aren't any syncs** attached to this server yet.",
                 f=Format.INFO
-            ))
+            ), ephemeral=True)
             return
 
         fields = []
@@ -81,7 +81,7 @@ class SyncModule(Module):
             fields=fields,
             color=Format.INFO.color,
             description=f"{description}\n​"
-        )])
+        )], ephemeral=True)
 
     @sync.sub_command(extends=dict(
         sync_id="The id of the previously created sync"
@@ -97,13 +97,13 @@ class SyncModule(Module):
             await ctx.respond(**create_message(
                 f"There is **no sync** with the id `{sync_id}` attached to this server.",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
 
         else:
             await ctx.respond(**create_message(
                 "Successfully **deleted sync**.",
                 f=Format.SUCCESS
-            ))
+            ), ephemeral=True)
 
     def _check_admin_on(self, guild, user):
         perms = Permissions.none()
@@ -152,7 +152,7 @@ class SyncModule(Module):
                 f"`{channel}` is **not a valid channel**. "
                 f"Please mention the channel using `#` or use the channel id.",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         channel_id = channel_match[0]
@@ -163,14 +163,14 @@ class SyncModule(Module):
                 f"**Can't find the channel** with the id `{channel_id}`. "
                 f"Are you sure that the bot has access to the channel?",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         if channel.type not in {ChannelType.GUILD_NEWS, ChannelType.GUILD_TEXT}:
             await ctx.respond(**create_message(
                 f"The channel must be a **text channel**.",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         guild = await ctx.bot.http.get_guild(channel.guild_id)
@@ -180,7 +180,7 @@ class SyncModule(Module):
                 await ctx.respond(**create_message(
                     f"You need **administrator permissions** in the target server.",
                     f=Format.ERROR
-                ))
+                ), ephemeral=True)
                 return
 
         async def _create_channel_sync(_source_id, _target_id):
@@ -192,7 +192,7 @@ class SyncModule(Module):
                     "less than **10 Webhooks in the target** channel.\n"
                     "If this is the case please wait a bit and try again.",
                     f=Format.ERROR
-                ))
+                ), ephemeral=True)
                 return
 
             sync_id = utils.unique_id()
@@ -222,7 +222,7 @@ class SyncModule(Module):
                 f"Successfully **created sync** from <#{_source_id}> "
                 f"to <#{_target_id}> with the id `{sync_id.upper()}`",
                 f=Format.SUCCESS
-            ))
+            ), ephemeral=True)
             await self.bot.db.audit_logs.insert_one({
                 "type": AuditLogType.MESSAGE_SYNC_CREATE,
                 "timestamp": datetime.utcnow(),
@@ -265,7 +265,7 @@ class SyncModule(Module):
                 await ctx.respond(**create_message(
                     f"You need **administrator permissions** in the target server.",
                     f=Format.ERROR
-                ))
+                ), ephemeral=True)
                 return
 
         async def _create_ban_sync(_source_id, _target_id):
@@ -283,7 +283,7 @@ class SyncModule(Module):
                 await ctx.respond(**create_message(
                     f"There is **already a ban sync** from `{_source_id}` to `{_target_id}`.",
                     f=Format.ERROR
-                ))
+                ), ephemeral=True)
                 return
 
             await ctx.respond(**create_message(
@@ -291,7 +291,7 @@ class SyncModule(Module):
                 f"with the id {sync_id.upper()}.\n"
                 f"You can copy all existing bans using `/copy` and `/paste !* bans`.",
                 f=Format.SUCCESS
-            ))
+            ), ephemeral=True)
             await self.bot.db.audit_logs.insert_one({
                 "type": AuditLogType.BAN_SYNC_CREATE,
                 "timestamp": datetime.utcnow(),
@@ -336,7 +336,7 @@ class SyncModule(Module):
                 await ctx.respond(**create_message(
                     f"You need **administrator permissions** in the target server.",
                     f=Format.ERROR
-                ))
+                ), ephemeral=True)
                 return
 
         role_a = ctx.resolved.roles.get(role_a)
@@ -372,7 +372,7 @@ class SyncModule(Module):
                     f"to `{_target_role.name}` (`{_target_role.id}`) "
                     f"**already exists**.",
                     f=Format.ERROR
-                ))
+                ), ephemeral=True)
 
             else:
                 await ctx.f_send(**create_message(
