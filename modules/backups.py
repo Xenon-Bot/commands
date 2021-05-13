@@ -81,7 +81,7 @@ def option_status_list(options):
         if status.state == backups_pb2.LoadStatus.State.RUNNING:
             result.append(f"**- {text}**")
         elif status.state == backups_pb2.LoadStatus.State.RATE_LIMIT:
-            result.append(f"**- {text}**")
+            result.append(f"**- {text}** ⚠️")
         else:
             result.append(f"- {text}")
 
@@ -472,6 +472,12 @@ class BackupsModule(Module):
             etl = timedelta_to_string(timedelta(minutes=minutes + int(seconds > 0)))
 
         details = "\n\n" + "\n".join([f"```{o.details}```" for o in reply.options.values() if o.details])
+        for o in reply.options.values():
+            if o.state == backups_pb2.LoadStatus.State.RATE_LIMIT:
+                details += f"\n```A long lasting ratelimit has been hit, " \
+                           f"you might want to cancel the loading process.```"
+                break
+
         await ctx.respond(**create_message(
             f"Estimated time required for this step: `{etl}`\n\n"
             f"Type `/backup cancel` to cancel the loading process.\n\n"
