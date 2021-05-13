@@ -79,7 +79,7 @@ class Xenon(InteractionBot):
                     "[Support Server](https://xenon.bot/discord).\n\n"
                     f"**Error Code**: `{error_id.upper()}`",
                     f=Format.ERROR
-                ))
+                ), ephemeral=True)
             except rest.HTTPException:
                 pass
 

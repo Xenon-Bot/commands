@@ -94,7 +94,7 @@ def option_status_list(options):
         if status.state == backups_pb2.LoadStatus.State.RUNNING:
             result.append(f"**- {text}**")
         elif status.state == backups_pb2.LoadStatus.State.RATE_LIMIT:
-            result.append(f"**- {text}**")
+            result.append(f"**- {text}** ⚠️")
         else:
             result.append(f"- {text}")
 
@@ -236,11 +236,14 @@ class BackupsModule(Module):
                 f"[Xenon Premium](https://www.patreon.com/merlinfuchs)** to create new backups.\n\n"
                 f"*Type `/backup list` to view your backups.*",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
-        # await ctx.count_cooldown()
-        await ctx.respond(**create_message("Creating backup ...", f=Format.PLEASE_WAIT))
+        await ctx.count_cooldown()
+        await ctx.respond(**create_message(
+            "Creating backup ...",
+            f=Format.PLEASE_WAIT
+        ), ephemeral=True)
 
         try:
             replies = await self.bot.rpc.backups.Create(backups_pb2.CreateRequest(
@@ -304,7 +307,7 @@ class BackupsModule(Module):
                 f"You have **no backup** with the id `{backup_id}`.\n\n"
                 f"*Keep in mind that you can only access your own backups.*",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         parsed_options = parse_options(
@@ -324,7 +327,7 @@ class BackupsModule(Module):
                 f"You can also load this backup without roles using"
                 f"```/backup load backup_id: {backup_id} options: !delete_roles !roles```",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         # Require a confirmation by the user
@@ -369,7 +372,6 @@ class BackupsModule(Module):
             "*This message might not be updated.*",
             f=Format.INFO
         ))
-        await asyncio.sleep(10)
 
         try:
             replies = await self.bot.rpc.backups.Load(backups_pb2.LoadRequest(
@@ -453,7 +455,7 @@ class BackupsModule(Module):
                 await ctx.respond(**create_message(
                     "There is **no loading process running** on this server.",
                     f=Format.ERROR
-                ))
+                ), ephemeral=True)
                 return
             else:
                 raise
@@ -461,7 +463,7 @@ class BackupsModule(Module):
         await ctx.respond(**create_message(
             "Successfully **cancelled the currently running loading process** on this server.",
             f=Format.SUCCESS
-        ))
+        ), ephemeral=True)
 
     @backup.sub_command()
     @checks.guild_only
@@ -478,7 +480,7 @@ class BackupsModule(Module):
                 await ctx.respond(**create_message(
                     "There is **no loading process running** on this server.",
                     f=Format.ERROR
-                ))
+                ), ephemeral=True)
                 return
             else:
                 raise
@@ -497,6 +499,12 @@ class BackupsModule(Module):
             etl = timedelta_to_string(timedelta(minutes=minutes + int(seconds > 0)))
 
         details = "\n\n" + "\n".join([f"```{o.details}```" for o in reply.options.values() if o.details])
+        for o in reply.options.values():
+            if o.state == backups_pb2.LoadStatus.State.RATE_LIMIT:
+                details += f"\n```A long lasting ratelimit has been hit, " \
+                           f"you might want to cancel the loading process.```"
+                break
+
         await ctx.respond(**create_message(
             f"Estimated time required for this step: `{etl}`\n\n"
             f"Type `/backup cancel` to cancel the loading process.\n\n"
@@ -504,7 +512,7 @@ class BackupsModule(Module):
             f"{details}",
             title="Loading Status",
             f=Format.INFO
-        ))
+        ), ephemeral=True)
 
     @backup.sub_command(
         extends=dict(
@@ -522,7 +530,7 @@ class BackupsModule(Module):
                 f"You have **no backup** with the id `{backup_id}`.\n\n"
                 f"*Keep in mind that you can only access your own backups.*",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         channel_list = channel_tree(data.channels)
@@ -566,7 +574,7 @@ class BackupsModule(Module):
                     "inline": True
                 },
             ]
-        }])
+        }], ephemeral=True)
 
     @backup.sub_command(extends=dict(
         page="The page to display (default 1)",
@@ -583,7 +591,7 @@ class BackupsModule(Module):
             await ctx.respond(**create_message(
                 "You **don't have any backups** yet. Use `/backup create` to create one.",
                 f=Format.INFO
-            ))
+            ), ephemeral=True)
             return
 
         if master_key is not None:
@@ -639,7 +647,7 @@ class BackupsModule(Module):
             fields=fields,
             color=Format.INFO.color,
             description=f"{description}\n​"
-        )])
+        )], ephemeral=True)
 
     @backup.sub_command(
         extends=dict(
@@ -666,13 +674,13 @@ class BackupsModule(Module):
             await ctx.respond(**create_message(
                 "Successfully **deleted backup**.",
                 f=Format.SUCCESS
-            ))
+            ), ephemeral=True)
 
         else:
             await ctx.respond(**create_message(
                 f"You have **no backup** with the id `{backup_id}`.",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
 
     @backup.sub_command(
         extends=dict(
@@ -700,22 +708,19 @@ class BackupsModule(Module):
             await ctx.respond(**create_message(
                 "There are **no backups** to delete.",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         await ctx.respond(**create_message(
             f"Are you sure that you want to delete **{delete_count}** of **{total_count}** total backups?\n\n"
             "Type `/confirm` to confirm this action and continue.",
             f=Format.WARNING
-        ))
+        ), ephemeral=True)
 
         try:
             await self.bot.wait_for_confirmation(ctx, timeout=60)
         except asyncio.TimeoutError:
-            try:
-                await ctx.delete_response()
-            except rest.HTTPNotFound:
-                pass
+            await ctx.delete_response()
             return
 
         deleted_count = await self._delete_backups(_filter)
@@ -724,7 +729,7 @@ class BackupsModule(Module):
         await ctx.edit_response(**create_message(
             f"Successfully deleted **{deleted_count}** of **{total_count}** total backups.",
             f=Format.SUCCESS
-        ))
+        ), ephemeral=True)
 
     @backup.sub_command_group()
     async def interval(self, ctx):
@@ -750,7 +755,7 @@ class BackupsModule(Module):
                 "The **backup interval is** currently turned **off**.\n"
                 "Turn it on with `/backup interval on 24h`.",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
 
         else:
             backups = []
@@ -784,7 +789,7 @@ class BackupsModule(Module):
                         "inline": False
                     }
                 ]
-            }])
+            }], ephemeral=True)
 
     @interval.sub_command(
         extends=dict(
@@ -819,7 +824,7 @@ class BackupsModule(Module):
             f"at `{datetime_to_string(now + interval_td)} UTC`.\n\n"
             f"Type `/backup list` to view your interval backups.",
             f=Format.SUCCESS
-        ))
+        ), ephemeral=True)
 
         # Create audit log entry
         await self.bot.db.audit_logs.insert_one({
@@ -845,7 +850,7 @@ class BackupsModule(Module):
             await ctx.respond(**create_message(
                 "Successfully **disabled your backup interval** for this server.",
                 f=Format.SUCCESS
-            ))
+            ), ephemeral=True)
 
             # Create audit log entry
             await self.bot.db.audit_logs.insert_one({
@@ -860,7 +865,7 @@ class BackupsModule(Module):
             await ctx.respond(**create_message(
                 f"Your backup interval is not enabled for this server.",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
 
     async def _retrieve_backup(self, creator, backup_id):
         if len(backup_id) > 20:

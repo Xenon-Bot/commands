@@ -31,7 +31,7 @@ class AdminModule(Module):
         await ctx.respond(**create_message(
             f"Admin commands are now available on the server with the id `{ctx.guild_id}`",
             f=Format.SUCCESS
-        ))
+        ), ephemeral=True)
 
     # @debug.sub_command()
     @guild_only
@@ -44,7 +44,7 @@ class AdminModule(Module):
         await ctx.respond(**create_message(
             f"Admin commands are no longer available on the server with the id `{ctx.guild_id}`",
             f=Format.SUCCESS
-        ))
+        ), ephemeral=True)
 
     # @Module.command(visible=False)
     @checks.is_bot_owner
@@ -58,14 +58,14 @@ class AdminModule(Module):
             await ctx.respond(**create_message(
                 "**Disabled maintenance** mode.",
                 f=Format.SUCCESS
-            ))
+            ), ephemeral=True)
 
         else:
             await self.bot.redis.set("cmd:maintenance", "1")
             await ctx.respond(**create_message(
                 "**Enabled maintenance** mode.",
                 f=Format.SUCCESS
-            ))
+            ), ephemeral=True)
 
     # @Module.command(visible=False)
     @checks.is_bot_owner
@@ -87,14 +87,14 @@ class AdminModule(Module):
                 f"```py\n{tb[:1900]}```",
                 title="Eval Error",
                 f=Format.SUCCESS
-            ))
+            ), ephemeral=True)
 
         else:
             await ctx.respond(**create_message(
                 f"```py\n{result}```",
                 title="Eval Result",
                 f=Format.SUCCESS
-            ))
+            ), ephemeral=True)
 
     # @Module.command(visible=False)
     @checks.is_bot_owner
@@ -126,14 +126,14 @@ class AdminModule(Module):
                 f"```py\n{tb[:1900]}```",
                 title="Exec Error",
                 f=Format.SUCCESS
-            ))
+            ), ephemeral=True)
 
         else:
             await ctx.respond(**create_message(
                 f"```py\n{result}```",
                 title="Exec Result",
                 f=Format.SUCCESS
-            ))
+            ), ephemeral=True)
 
     # @Module.command(visible=False)
     @checks.is_bot_owner
@@ -146,7 +146,7 @@ class AdminModule(Module):
             f"```py\n{result}\n```",
             title="Redis Result",
             f=Format.SUCCESS
-        ))
+        ), ephemeral=True)
 
     @Module.command(visible=True)
     @checks.is_bot_owner
@@ -167,7 +167,7 @@ class AdminModule(Module):
                 error_list or "None in the last 24 hours",
                 title="Command Errors",
                 f=Format.INFO
-            ))
+            ), ephemeral=True)
             return
 
         elif error_id == "test":
@@ -179,7 +179,7 @@ class AdminModule(Module):
             await ctx.respond(**create_message(
                 f"**Unknown error** with the id `{error_id.upper()}`.",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         data = json.loads(error)
@@ -229,7 +229,7 @@ class AdminModule(Module):
             })
 
         while len(embeds) > 0:
-            await ctx.respond(embeds=embeds[:3])
+            await ctx.respond(embeds=embeds[:3], ephemeral=True)
             embeds = embeds[3:]
 
         if delete:

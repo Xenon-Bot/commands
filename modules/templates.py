@@ -8,7 +8,7 @@ from dbots.protos import backups_pb2
 import grpclib
 
 from .audit_logs import AuditLogType
-from .backups import option_list, convert_v1_to_v2, channel_tree, parse_options
+from .backups import option_status_list, convert_v1_to_v2, channel_tree, parse_options, option_list
 
 
 class TemplatesModule(Module):
@@ -110,7 +110,7 @@ class TemplatesModule(Module):
                 f"Can't find a template with the name, id or url `{name_or_id}`.\n"
                 f"Go to [templates.xenon.bot](https://templates.xenon.bot) to get a list of available templates.",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         data = convert_v1_to_v2(template["data"])
@@ -130,7 +130,7 @@ class TemplatesModule(Module):
                 f"You can also load this template without roles using"
                 f"```/template load name_or_id: {name_or_id} options: !delete_roles !roles```",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         # Require a confirmation by the user
@@ -175,7 +175,6 @@ class TemplatesModule(Module):
             "*This message might not be updated.*",
             f=Format.INFO
         ))
-        await asyncio.sleep(5)
 
         try:
             replies = await self.bot.rpc.backups.Load(backups_pb2.LoadRequest(
@@ -258,7 +257,7 @@ class TemplatesModule(Module):
                 await ctx.respond(**create_message(
                     "There is **no loading process running** on this server.",
                     f=Format.ERROR
-                ))
+                ), ephemeral=True)
                 return
             else:
                 raise
@@ -266,7 +265,7 @@ class TemplatesModule(Module):
         await ctx.respond(**create_message(
             "Successfully **cancelled the currently running loading process** on this server.",
             f=Format.SUCCESS
-        ))
+        ), ephemeral=True)
 
     @template.sub_command()
     @checks.guild_only
@@ -283,27 +282,39 @@ class TemplatesModule(Module):
                 await ctx.respond(**create_message(
                     "There is **no loading process running** on this server.",
                     f=Format.ERROR
-                ))
+                ), ephemeral=True)
                 return
             else:
                 raise
 
-        minutes = reply.estimated_time_left // 60
-        seconds = reply.estimated_time_left % 60
+        estimated_time_left = sum([
+            o.estimated_time_left
+            for o in reply.options.values()
+            if o.state != backups_pb2.LoadStatus.State.WAITING
+        ])
+
+        minutes = estimated_time_left // 60
+        seconds = estimated_time_left % 60
         if minutes == 0:
             etl = "< 1 minute"
         else:
             etl = timedelta_to_string(timedelta(minutes=minutes + int(seconds > 0)))
 
-        details = f"\n\n```{reply.details}```" if reply.details else ""
+        details = "\n\n" + "\n".join([f"```{o.details}```" for o in reply.options.values() if o.details])
+        for o in reply.options.values():
+            if o.state == backups_pb2.LoadStatus.State.RATE_LIMIT:
+                details += f"\n```A long lasting ratelimit has been hit, " \
+                           f"you might want to cancel the loading process.```"
+                break
+
         await ctx.respond(**create_message(
             f"Estimated time required for this step: `{etl}`\n\n"
             f"Type `/template cancel` to cancel the loading process.\n\n"
-            f"{option_list(reply.options, status=reply.option)}"
+            f"{option_status_list(reply.options)}"
             f"{details}",
             title="Loading Status",
             f=Format.INFO
-        ))
+        ), ephemeral=True)
 
     @template.sub_command()
     async def list(self, ctx):
@@ -330,7 +341,7 @@ class TemplatesModule(Module):
                 f"Can't find a template with the name, id or url `{name_or_id}`.\n"
                 f"Go to [templates.xenon.bot](https://templates.xenon.bot) to get a list of available templates.",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         data = convert_v1_to_v2(template["data"])
@@ -374,4 +385,4 @@ class TemplatesModule(Module):
                     "inline": True
                 },
             ]
-        }])
+        }], ephemeral=True)
