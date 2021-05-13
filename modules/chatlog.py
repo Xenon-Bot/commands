@@ -7,6 +7,8 @@ import ecies
 from datetime import datetime
 import asyncio
 from dbots.protos import chatlogs_pb2
+import brotli
+import hashlib
 
 from util import PremiumLevel
 from . import encryption
@@ -27,7 +29,30 @@ MAX_CHATLOGS = {
 
 
 def convert_v1_to_v2(data):
-    pass
+    messages = []
+    users = {}
+    for message in data:
+        users[message["author"]["id"]] = chatlogs_pb2.ChatlogData.User(
+            username=message["author"]["username"],
+            discriminator=message["author"]["discriminator"],
+            avatar=message["author"]["avatar"]
+        )
+
+        messages.append(chatlogs_pb2.ChatlogData.Message(
+            id=message["id"],
+            content=message["content"],
+            pinned=message["pinned"],
+            attachments=[
+                chatlogs_pb2.ChatlogData.Message.Attachment(
+                    filename=attachment["filename"],
+                    url=attachment["url"]
+                )
+                for attachment in message["attachments"]
+            ],
+            embed=[]  # TODO: Convert embeds
+        ))
+
+    return chatlogs_pb2.ChatlogData(messages=messages, users=users)
 
 
 class ChatlogModule(Module):
@@ -74,7 +99,7 @@ class ChatlogModule(Module):
             before_id=before
         ))
 
-        chatlog_id = await self._store_chatlog(ctx.author.id, reply.data)
+        chatlog_id = await self._store_chatlog(ctx.author.id, ctx.channel_id, reply.data)
 
         await ctx.edit_response(**create_message(
             f"Successfully **created chatlog** with the id `{chatlog_id}`.\n\n"
@@ -239,8 +264,72 @@ class ChatlogModule(Module):
             f=Format.SUCCESS
         ))
 
-    async def _store_chatlog(self, creator, data):
-        pass
+    async def _store_chatlog(self, creator, channel, data):
+        raw = await self.bot.loop.run_in_executor(None, lambda: brotli.compress(data.SerializeToString()))
+        chatlog_id = unique_id().upper()
+
+        doc = {
+            "_id": chatlog_id.lower(),
+            "version": 2,
+            "creator": creator,
+            "timestamp": datetime.utcnow(),
+            "channel": channel,
+            "encrypted": False,
+            "data": {
+                "id": channel,
+                "raw": raw
+            }
+        }
+
+        public_key = await encryption.get_public_key(self.bot, creator)
+        if public_key is not None:
+            key_bytes, nonce_bytes, symmetric_key = encryption.get_symmetric_key()
+            chatlog_id = encryption.key_to_id(key_bytes)
+            doc["_id"] = base64.b64encode(hashlib.sha3_512(key_bytes).digest()).decode()
+            doc["encrypted"] = True
+            doc["data"]["raw"] = await self.bot.loop.run_in_executor(None, lambda: symmetric_key.encrypt(raw))
+            doc["data"]["nonce"] = nonce_bytes
+            doc["data"]["key"] = ecies.encrypt(public_key, key_bytes)
+
+        await self.bot.db.premium.chatlogs.insert_one(doc)
+        return chatlog_id
 
     async def _retrieve_chatlog(self, creator, chatlog_id):
-        pass
+        if len(chatlog_id) > 20:
+            try:
+                key_bytes = encryption.id_to_key(chatlog_id)
+            except (binascii.Error, ValueError):
+                return None, None
+            identifier = base64.b64encode(hashlib.sha3_512(key_bytes).digest()).decode()
+            doc = await self.bot.db.premium.chatlogs.find_one({"_id": identifier, "creator": creator})
+            if doc is None:
+                return None, None
+
+            _, _, key = encryption.get_symmetric_key(key_bytes, doc["data"]["nonce"])
+            doc["data"]["raw"] = await self.bot.loop.run_in_executor(None, lambda: key.decrypt(doc["data"]["raw"]))
+
+        else:
+            doc = await self.bot.db.backups.find_one({"_id": chatlog_id.lower(), "creator": creator})
+            if doc is None:
+                return None, None
+
+        if doc.get("version") != 2:
+            data = convert_v1_to_v2(doc["data"])
+            del doc["data"]
+            return doc, data
+
+        data = chatlogs_pb2.ChatlogData()
+        await self.bot.loop.run_in_executor(None, lambda: data.ParseFromString(brotli.decompress(doc["data"]["raw"])))
+        del doc["data"]
+        return doc, data
+
+    async def _delete_chatlog(self, creator, chatlog_id):
+        result = await self.bot.db.premium.chatlogs.delete_one({
+            "_id": chatlog_id,
+            "creator": creator
+        })
+        return result.deleted_count > 0
+
+    async def _delete_chatlogs(self, _filter):
+        result = await self.bot.db.premium.chatlogs.delete_many(_filter)
+        return result.deleted_count
