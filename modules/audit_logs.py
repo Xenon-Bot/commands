@@ -90,4 +90,4 @@ class AuditLogModule(Module):
             fields=fields,
             color=Format.INFO.color,
             description=f"{description}\n​"
-        )])
+        )], ephemeral=True)

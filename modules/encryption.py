@@ -48,8 +48,7 @@ class EncryptionModule(Module):
             await ctx.respond(**create_message(
                 "**Encryption** for new backups and chatlogs has been **enabled** again. "
                 "Your master key stays the same.",
-                f=Format.SUCCESS,
-                embed=False
+                f=Format.SUCCESS
             ), ephemeral=True)
             return
 
@@ -84,8 +83,7 @@ class EncryptionModule(Module):
         if result.matched_count == 0:
             await ctx.respond(**create_message(
                 "Encryption was never enabled. Use `/encryption enable` to enable it.",
-                f=Format.ERROR,
-                embed=False
+                f=Format.ERROR
             ), ephemeral=True)
 
         else:
@@ -93,8 +91,7 @@ class EncryptionModule(Module):
                 "**Encryption** for new backups and chatlogs **has been disabled**. "
                 "Use `/encryption enable` to enable it again.\n"
                 "**This does not reset your master key**",
-                f=Format.SUCCESS,
-                embed=False
+                f=Format.SUCCESS
             ), ephemeral=True)
 
     @encryption.sub_command(ephemeral=True)
@@ -107,8 +104,7 @@ class EncryptionModule(Module):
         await ctx.respond(**create_message(
             "**Hey, be careful!** This action will delete all you encrypted backups and **can not be undone**:\n\n"
             f"Type `/confirm` to confirm this action and continue.",
-            f=Format.WARNING,
-            embed=False
+            f=Format.WARNING
         ), ephemeral=True)
 
         try:
@@ -123,6 +119,5 @@ class EncryptionModule(Module):
         await ctx.edit_response(**create_message(
             "Encryption has been disabled, your master key has been reset and all your encrypted have been deleted.\n\n"
             "Use `/encryption enable` to enable encryption again and get a new master key.",
-            f=Format.SUCCESS,
-            embed=False
+            f=Format.SUCCESS
         ), ephemeral=True)

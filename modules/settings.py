@@ -38,7 +38,7 @@ class SettingsModule(Module):
                     "value": PERMISSION_DESCRIPTIONS[permissions_level]
                 }
             ]
-        }])
+        }], ephemeral=True)
 
     @settings.sub_command()
     @guild_only
@@ -52,7 +52,7 @@ class SettingsModule(Module):
         await ctx.respond(**create_message(
             "Successfully **reset settings** to the default values.",
             f=Format.SUCCESS
-        ))
+        ), ephemeral=True)
 
     @settings.sub_command(
         extends=dict(
@@ -102,4 +102,4 @@ class SettingsModule(Module):
             f"**{PERMISSION_DESCRIPTIONS[level]}**.\n\n"
             f"*Use `/help settings permissions` to get more info.*",
             f=Format.SUCCESS
-        ))
+        ), ephemeral=True)

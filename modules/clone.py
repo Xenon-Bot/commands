@@ -33,7 +33,7 @@ class CloneModule(Module):
             await ctx.respond(**create_message(
                 f"Can't find the specified channel in this server",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         children = []
@@ -46,7 +46,7 @@ class CloneModule(Module):
             await ctx.respond(**create_message(
                 "There is **not enough space** to clone the channel(s). Each server can only have up to 500 channels.",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
 
         await ctx.count_cooldown()
         new_channel = await ctx.bot.http.create_guild_channel(ctx.guild_id, **channel.to_dict())
@@ -64,19 +64,19 @@ class CloneModule(Module):
                 await ctx.respond(**create_message(
                     f"Successfully **cloned the category** <#{new_channel.id}> including all child channels..",
                     f=Format.SUCCESS
-                ))
+                ), ephemeral=True)
 
             else:
                 await ctx.respond(**create_message(
                     f"Successfully **cloned the category** <#{new_channel.id}>.",
                     f=Format.SUCCESS
-                ))
+                ), ephemeral=True)
 
         else:
             await ctx.respond(**create_message(
                 f"Successfully **cloned the channel** <#{new_channel.id}>.",
                 f=Format.SUCCESS
-            ))
+            ), ephemeral=True)
 
     @clone.sub_command(
         extends=dict(
@@ -100,14 +100,14 @@ class CloneModule(Module):
             await ctx.respond(**create_message(
                 f"Can't find the specified role in this server",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         if len(roles) >= 250:
             await ctx.respond(**create_message(
                 "There are already **250 roles in this server**. Delete one to be able to create a new one.",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
 
         new_role = await ctx.bot.http.create_guild_role(ctx.guild_id, **role.to_dict())
         if apply_overwrites:
@@ -139,4 +139,4 @@ class CloneModule(Module):
         await ctx.respond(**create_message(
             f"Successfully **cloned the role**: <@&{new_role.id}>.",
             f=Format.SUCCESS
-        ))
+        ), ephemeral=True)

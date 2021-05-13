@@ -110,7 +110,7 @@ class TemplatesModule(Module):
                 f"Can't find a template with the name, id or url `{name_or_id}`.\n"
                 f"Go to [templates.xenon.bot](https://templates.xenon.bot) to get a list of available templates.",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         data = convert_v1_to_v2(template["data"])
@@ -130,16 +130,16 @@ class TemplatesModule(Module):
                 f"You can also load this template without roles using"
                 f"```/template load name_or_id: {name_or_id} options: !delete_roles !roles```",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         # Require a confirmation by the user
         await ctx.respond(**create_message(
-                "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
-                f"{option_list(parsed_options)}\n\n"
-                f"Type `/confirm` to confirm this action and continue.",
-                f=Format.WARNING
-            ))
+            "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
+            f"{option_list(parsed_options)}\n\n"
+            f"Type `/confirm` to confirm this action and continue.",
+            f=Format.WARNING
+        ))
 
         try:
             await self.bot.wait_for_confirmation(ctx, timeout=60)
@@ -257,7 +257,7 @@ class TemplatesModule(Module):
                 await ctx.respond(**create_message(
                     "There is **no loading process running** on this server.",
                     f=Format.ERROR
-                ))
+                ), ephemeral=True)
                 return
             else:
                 raise
@@ -265,7 +265,7 @@ class TemplatesModule(Module):
         await ctx.respond(**create_message(
             "Successfully **cancelled the currently running loading process** on this server.",
             f=Format.SUCCESS
-        ))
+        ), ephemeral=True)
 
     @template.sub_command()
     @checks.guild_only
@@ -282,7 +282,7 @@ class TemplatesModule(Module):
                 await ctx.respond(**create_message(
                     "There is **no loading process running** on this server.",
                     f=Format.ERROR
-                ))
+                ), ephemeral=True)
                 return
             else:
                 raise
@@ -314,7 +314,7 @@ class TemplatesModule(Module):
             f"{details}",
             title="Loading Status",
             f=Format.INFO
-        ))
+        ), ephemeral=True)
 
     @template.sub_command()
     async def list(self, ctx):
@@ -341,7 +341,7 @@ class TemplatesModule(Module):
                 f"Can't find a template with the name, id or url `{name_or_id}`.\n"
                 f"Go to [templates.xenon.bot](https://templates.xenon.bot) to get a list of available templates.",
                 f=Format.ERROR
-            ))
+            ), ephemeral=True)
             return
 
         data = convert_v1_to_v2(template["data"])
@@ -385,4 +385,4 @@ class TemplatesModule(Module):
                     "inline": True
                 },
             ]
-        }])
+        }], ephemeral=True)
