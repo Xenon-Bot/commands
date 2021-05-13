@@ -254,7 +254,10 @@ class ChatlogModule(Module):
             await self.bot.wait_for_confirmation(ctx, timeout=60)
         except asyncio.TimeoutError:
             try:
-                await ctx.delete_response()
+                await ctx.edit_response(**create_message(
+                    f"You action has **timed out**. Use `/chatlog purge` to try again.",
+                    f=Format.INFO
+                ), ephemeral=True)
             except rest.HTTPNotFound:
                 pass
             return
