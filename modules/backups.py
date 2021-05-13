@@ -720,7 +720,10 @@ class BackupsModule(Module):
         try:
             await self.bot.wait_for_confirmation(ctx, timeout=60)
         except asyncio.TimeoutError:
-            await ctx.delete_response()
+            await ctx.edit_response(**create_message(
+                f"You action has **timed out**. Use `/backup purge` to try again.",
+                f=Format.INFO
+            ), ephemeral=True)
             return
 
         deleted_count = await self._delete_backups(_filter)

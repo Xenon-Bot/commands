@@ -110,7 +110,10 @@ class EncryptionModule(Module):
         try:
             await self.bot.wait_for_confirmation(ctx, timeout=60)
         except asyncio.TimeoutError:
-            await ctx.delete_response()
+            await ctx.edit_response(**create_message(
+                f"You action has **timed out**. Use `/encryption reset` to try again.",
+                f=Format.INFO
+            ), ephemeral=True)
             return
 
         await ctx.count_cooldown()
