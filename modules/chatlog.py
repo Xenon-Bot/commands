@@ -68,14 +68,13 @@ class ChatlogModule(Module):
         # await ctx.count_cooldown()
         await ctx.respond(**create_message("Creating chatlog ...", f=Format.PLEASE_WAIT))
 
-        replies = await self.bot.rpc.chatlogs.Create(chatlogs_pb2.CreateRequest(
+        reply = await self.bot.rpc.chatlogs.Create(chatlogs_pb2.CreateRequest(
             channel_id=ctx.channel_id,
             message_count=message_count,
             before_id=before
         ))
 
-        data = replies[-1].data
-        chatlog_id = await self._store_chatlog(ctx.author.id, data)
+        chatlog_id = await self._store_chatlog(ctx.author.id, reply.data)
 
         await ctx.edit_response(**create_message(
             f"Successfully **created chatlog** with the id `{chatlog_id}`.\n\n"

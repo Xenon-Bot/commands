@@ -24,18 +24,13 @@ class ClipboardModule(Module):
     @checks.guild_only
     @checks.has_permissions_level()
     @checks.bot_has_permissions("administrator")
-    @checks.cooldown(1, 30, bucket=checks.CooldownType.GUILD, manual=True)
+    @checks.cooldown(1, 30, bucket=checks.CooldownType.GUILD)
     async def copy(self, ctx, message_count: int = 250):
         """
         Save this server to your clipboard
         """
         max_message_count = MAX_MESSAGE_COUNT[ctx.premium_level]
         message_count = min(message_count, max_message_count)
-
-        if await ctx.bot.redis.exists(f"clipboard:{ctx.author.id}"):
-            pass
-
-        await ctx.count_cooldown()
         await ctx.respond(**create_message("Saving to clipboard ...", f=Format.PLEASE_WAIT))
 
         replies = await self.bot.rpc.backups.Create(backups_pb2.CreateRequest(
