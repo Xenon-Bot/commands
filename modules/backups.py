@@ -344,7 +344,6 @@ class BackupsModule(Module):
             "*This message might not be updated.*",
             f=Format.INFO
         ))
-        await asyncio.sleep(10)
 
         try:
             replies = await self.bot.rpc.backups.Load(backups_pb2.LoadRequest(
