@@ -45,6 +45,7 @@ def convert_v1_to_v2(data):
             id=message["id"],
             content=message["content"],
             pinned=message["pinned"],
+            author_id=message["author"]["id"],
             attachments=[
                 chatlogs_pb2.ChatlogData.Message.Attachment(
                     filename=attachment["filename"],
