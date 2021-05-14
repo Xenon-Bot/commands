@@ -124,7 +124,7 @@ class ClipboardModule(Module):
         except asyncio.TimeoutError:
             try:
                 await ctx.delete_response()
-            except rest.HTTPNotFound:
+            except rest.HTTPException:
                 pass
             return
 
@@ -182,7 +182,7 @@ class ClipboardModule(Module):
                 f"Successfully **loaded the server from the clipboard**.",
                 f=Format.SUCCESS
             ))
-        except rest.HTTPNotFound:
+        except rest.HTTPException:
             pass
 
         # Save ids for later use and recovery

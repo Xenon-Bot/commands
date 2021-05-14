@@ -258,7 +258,7 @@ class ChatlogModule(Module):
                     f"You action has **timed out**. Use `/chatlog purge` to try again.",
                     f=Format.INFO
                 ), ephemeral=True)
-            except rest.HTTPNotFound:
+            except rest.HTTPException:
                 pass
             return
 
