@@ -38,6 +38,7 @@ class SyncModule(Module):
         """
         List all syncs related to this server
         """
+        page = max(page, 1)
         _filter = {"guilds": ctx.guild_id}
         total_count = await self.bot.db.premium.syncs.count_documents(_filter)
         if total_count == 0:

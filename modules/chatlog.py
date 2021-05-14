@@ -146,6 +146,7 @@ class ChatlogModule(Module):
         """
         Get a list of all your previously created chatlogs
         """
+        page = max(page, 1)
         _filter = {"creator": ctx.author.id}
         total_count = await self.bot.db.premium.chatlogs.count_documents(_filter)
         if total_count == 0:
