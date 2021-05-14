@@ -172,6 +172,20 @@ class ClipboardModule(Module):
                     f=Format.ERROR
                 ))
                 return
+            elif e.status == grpclib.Status.NOT_FOUND:
+                await ctx.edit_response(**create_message(
+                    f"Xenon doesn't seem to be on this server, "
+                    f"please click [here](https://xenon.bot/invite) to invite it again.",
+                    f=Format.ERROR
+                ))
+                return
+            elif e.status == grpclib.Status.RESOURCE_EXHAUSTED:
+                await ctx.edit_response(**create_message(
+                    f"Xenon is currently experiencing increased load and can't process your request, "
+                    f"please **try again in a few minutes**.",
+                    f=Format.ERROR
+                ))
+                return
             elif e.status == grpclib.Status.CANCELLED:
                 return
             else:
