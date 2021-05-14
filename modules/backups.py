@@ -5,6 +5,7 @@ import pymongo
 import pymongo.errors
 from datetime import datetime, timedelta
 from dbots.protos import backups_pb2
+from dbots.protos import chatlogs_pb2
 from grpclib.exceptions import GRPCError
 import grpclib
 import brotli
@@ -16,6 +17,7 @@ import hashlib
 import binascii
 
 from .audit_logs import AuditLogType
+from . import chatlog
 from . import encryption
 from util import *
 
@@ -70,7 +72,7 @@ option_descriptions = dict(
     channels="New channels will be loaded",
     settings="Server settings will be updated",
     members="Member roles and nicknames will be loaded",
-    messages="Some messages will be loaded"
+    messages="Messages will be loaded"
 )
 
 
@@ -102,7 +104,6 @@ def option_status_list(options):
 
 
 def convert_v1_to_v2(data):
-    messages = data.get("messages", {})
     channels = []
     for channel in data["channels"]:
         channels.append(
@@ -125,7 +126,7 @@ def convert_v1_to_v2(data):
                 topic=channel.get("topic"),
                 nsfw=channel.get("nsfw"),
                 rate_limit_per_user=channel.get("rate_limit_per_user"),
-                # messages=[],  # TODO: convert messages
+                chatlog=chatlog.convert_v1_to_v2(channel["messages"]) if "messages" in channel else None,
 
                 bitrate=channel.get("bitrate"),
                 user_limit=channel.get("user_limit")

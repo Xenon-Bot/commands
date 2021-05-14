@@ -9,6 +9,9 @@ import asyncio
 from dbots.protos import chatlogs_pb2
 import brotli
 import hashlib
+from grpclib.exceptions import GRPCError
+import grpclib
+import json
 
 from util import PremiumLevel
 from . import encryption
@@ -47,9 +50,12 @@ def convert_v1_to_v2(data):
                     filename=attachment["filename"],
                     url=attachment["url"]
                 )
-                for attachment in message["attachments"]
+                for attachment in message.get("attachments", [])
             ],
-            embed=[]  # TODO: Convert embeds
+            embeds=[
+                json.dumps(embed).encode("utf-8")
+                for embed in message.get("embeds", [])
+            ]
         ))
 
     return chatlogs_pb2.ChatlogData(messages=messages, users=users)
@@ -69,6 +75,7 @@ class ChatlogModule(Module):
     @checks.guild_only
     @checks.has_permissions_level()
     @checks.bot_has_permissions("view_channel", "read_message_history")
+    @checks.cooldown(2, 30, bucket=checks.CooldownType.CHANNEL, manual=True)
     async def create(self, ctx, message_count: int = 1000, before=None):
         """
         Create a chatlog of this channel
@@ -82,10 +89,10 @@ class ChatlogModule(Module):
         chatlog_count = await ctx.bot.db.premium.chatlogs.count_documents({"creator": ctx.author.id})
         if chatlog_count > max_chatlogs:
             await ctx.respond(**create_message(
-                f"You have **exceeded the maximum count** of backups. (`{chatlog_count}/{max_chatlogs}`)\n"
-                f"You need to **delete old backups** with `/backup delete` or **buy "
-                f"[Xenon Premium](https://www.patreon.com/merlinfuchs)** to create new backups.\n\n"
-                f"*Type `/backup list` to view your backups.*",
+                f"You have **exceeded the maximum count** of chatlogs. (`{chatlog_count}/{max_chatlogs}`)\n"
+                f"You need to **delete old chatlogs** with `/chatlog delete` or **buy "
+                f"[Xenon Premium](https://www.patreon.com/merlinfuchs)** to create new chatlogs.\n\n"
+                f"*Type `/chatlog list` to view your chatlogs.*",
                 f=Format.ERROR
             ), ephemeral=True)
             return
@@ -107,8 +114,8 @@ class ChatlogModule(Module):
         await ctx.edit_response(**create_message(
             f"Successfully **created chatlog** with the id `{chatlog_id}`.\n\n"
             f"**Usage**\n"
-            f"```/backup info backup_id: {chatlog_id}```"
-            f"```/backup load backup_id: {chatlog_id}```",
+            f"```/chatlog info chatlog_id: {chatlog_id}```"
+            f"```/chatlog load chatlog_id: {chatlog_id}```",
             f=Format.SUCCESS
         ))
 
@@ -126,20 +133,128 @@ class ChatlogModule(Module):
     @checks.has_permissions_level(destructive=True)
     @checks.bot_has_permissions("manage_webhooks")
     @checks.not_in_maintenance
+    @checks.cooldown(1, 30, bucket=checks.CooldownType.CHANNEL, manual=True)
     async def load(self, ctx, chatlog_id, message_count: int = 1000):
         """
         Load a previously created chatlog in this channel
         """
+        max_message_count = MAX_MESSAGE_COUNT[ctx.premium_level]
+        message_count = min(message_count, max_message_count)
+
+        props, data = await self._retrieve_chatlog(ctx.author.id, chatlog_id)
+        if data is None:
+            await ctx.respond(**create_message(
+                f"You have **no chatlog** with the id `{chatlog_id}`.\n\n"
+                f"*Keep in mind that you can only access your own chatlogs.*",
+                f=Format.ERROR
+            ), ephemeral=True)
+            return
+
+        # Require a confirmation by the user
+        await ctx.respond(**create_message(
+            "**Hey, be careful!** Are you sure that you want to load this chatlog?\n\n"
+            f"Type `/confirm` to confirm this action and continue.",
+            f=Format.WARNING
+        ))
+
+        try:
+            await self.bot.wait_for_confirmation(ctx, timeout=60)
+        except asyncio.TimeoutError:
+            try:
+                await ctx.delete_response()
+            except rest.HTTPException:
+                pass
+            return
+
+        await ctx.count_cooldown()
+
+        # Create audit log entry
+        await self.bot.db.audit_logs.insert_one({
+            "type": AuditLogType.CHATLOG_LOAD,
+            "timestamp": datetime.utcnow(),
+            "guilds": [ctx.guild_id],
+            "user": ctx.author.id,
+            "extra": {"channel": ctx.channel_id}
+        })
+
+        await ctx.edit_response(**create_message(
+            "**The chatlog will start loading now**. Please be patient, this can take a while!\n\n"
+            "*This message might not be updated.*",
+            f=Format.INFO
+        ))
+
+        try:
+            await self.bot.rpc.chatlogs.Load(chatlogs_pb2.LoadRequest(
+                channel_id=ctx.channel_id,
+                message_count=message_count,
+                data=data
+            ))
+        except GRPCError as e:
+            if e.status == grpclib.Status.NOT_FOUND:
+                await ctx.edit_response(**create_message(
+                    f"Xenon doesn't seem to be on this server, "
+                    f"please click [here](https://xenon.bot/invite) to invite it again.",
+                    f=Format.ERROR
+                ))
+                return
+            elif e.status == grpclib.Status.CANCELLED:
+                return
+            else:
+                raise
+
+        try:
+            await ctx.edit_response(**create_message(
+                f"Successfully **loaded the chatlog**.",
+                f=Format.SUCCESS
+            ))
+        except rest.HTTPException:
+            pass
 
     @chatlog.sub_command()
+    @checks.cooldown(5, 30, bucket=checks.CooldownType.AUTHOR)
     async def info(self, ctx, chatlog_id):
         """
         Get information about a previously created chatlog
         """
+        props, data = await self._retrieve_chatlog(ctx.author.id, chatlog_id)
+        if data is None:
+            await ctx.respond(**create_message(
+                f"You have **no chatlog** with the id `{chatlog_id}`.\n\n"
+                f"*Keep in mind that you can only access your own chatlogs.*",
+                f=Format.ERROR
+            ), ephemeral=True)
+            return
+
+        await ctx.respond(embeds=[{
+            "title": f"Chatlog Info - <#{props['channel']}>",
+            "color": Format.INFO.color,
+            "fields": [
+                {
+                    "name": "Created At",
+                    "value": datetime_to_string(props["timestamp"]),
+                    "inline": False
+                },
+                {
+                    "name": "Message Count",
+                    "value": len(data.messages),
+                    "inline": False
+                },
+                {
+                    "name": "First Message",
+                    "value": f"`{data.messages[-1].id}`",
+                    "inline": True
+                },
+                {
+                    "name": "Last Message",
+                    "value": f"`{data.messages[0].id}`",
+                    "inline": True
+                },
+            ]
+        }], ephemeral=True)
 
     @chatlog.sub_command(extends=dict(
         page="The page to display (default 1)",
-        master_kay="The master key (only for encrypted backups)"
+        master_kay="The master key (only for encrypted chatlogs)"
     ))
     @checks.cooldown(2, 10, bucket=checks.CooldownType.AUTHOR)
     async def list(self, ctx, page: int = 1, master_key: str = None):
@@ -169,7 +284,7 @@ class ChatlogModule(Module):
                 sort=[("timestamp", pymongo.DESCENDING)],
                 limit=10,
                 skip=(page - 1) * 10,
-                projection=("_id", "timestamp", "encrypted", "data.key", "data.name")
+                projection=("_id", "timestamp", "encrypted", "data.key", "channel")
         ):
             properties = []
             if chatlog.get("encrypted"):
@@ -188,7 +303,7 @@ class ChatlogModule(Module):
 
             fields.append(dict(
                 name=chatlog_id + f" • {' '.join(properties)}" * (len(properties) > 0),
-                value=f"#{chatlog['data']['name']} (`{datetime_to_string(chatlog['timestamp'])} UTC`)"
+                value=f"<#{chatlog['channel']}> (`{datetime_to_string(chatlog['timestamp'])} UTC`)"
             ))
 
         description = f"Displaying **{(page - 1) * 10 + 1}** - **{min(page * 10, total_count)}** " \
@@ -206,6 +321,7 @@ class ChatlogModule(Module):
         )], ephemeral=True)
 
     @chatlog.sub_command()
+    @checks.cooldown(5, 30, bucket=checks.CooldownType.AUTHOR)
     async def delete(self, ctx, chatlog_id):
         """
         Delete one of your previously created chatlogs
@@ -223,8 +339,9 @@ class ChatlogModule(Module):
             ), ephemeral=True)
 
     @chatlog.sub_command(extends=dict(
-        older_than="Only backups that are older than this will be deleted (e.g. 24h)"
+        older_than="Only chatlogs that are older than this will be deleted (e.g. 24h)"
     ))
+    @checks.cooldown(1, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
     async def purge(self, ctx, older_than=""):
         """
         Delete all your previously created chatlogs
@@ -267,7 +384,7 @@ class ChatlogModule(Module):
 
         await ctx.count_cooldown()
         await ctx.edit_response(**create_message(
-            f"Successfully deleted **{result.deleted_count}** of **{total_count}** total backups.",
+            f"Successfully deleted **{result.deleted_count}** of **{total_count}** total chatlogs.",
             f=Format.SUCCESS
         ))
 
@@ -316,7 +433,7 @@ class ChatlogModule(Module):
             doc["data"]["raw"] = await self.bot.loop.run_in_executor(None, lambda: key.decrypt(doc["data"]["raw"]))
 
         else:
-            doc = await self.bot.db.backups.find_one({"_id": chatlog_id.lower(), "creator": creator})
+            doc = await self.bot.db.premium.chatlogs.find_one({"_id": chatlog_id.lower(), "creator": creator})
             if doc is None:
                 return None, None
 
