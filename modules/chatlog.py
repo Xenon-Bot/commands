@@ -227,7 +227,7 @@ class ChatlogModule(Module):
             return
 
         await ctx.respond(embeds=[{
-            "title": f"Chatlog Info - <#{props['channel']}>",
+            "description": f"**Chatlog Info - <#{props['channel']}>**",
             "color": Format.INFO.color,
             "fields": [
                 {
