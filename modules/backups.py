@@ -343,7 +343,7 @@ class BackupsModule(Module):
         except asyncio.TimeoutError:
             try:
                 await ctx.delete_response()
-            except rest.HTTPNotFound:
+            except rest.HTTPException:
                 pass
             return
 
@@ -414,7 +414,7 @@ class BackupsModule(Module):
                 f"Successfully **loaded the backup**.",
                 f=Format.SUCCESS
             ))
-        except rest.HTTPNotFound:
+        except rest.HTTPException:
             pass
 
         # Save ids for later use and recovery
@@ -585,6 +585,7 @@ class BackupsModule(Module):
         """
         Get a list of all your previously created backups
         """
+        page = max(page, 1)
         _filter = {"creator": ctx.author.id}
         total_count = await self.bot.db.backups.count_documents(_filter)
         if total_count == 0:
@@ -693,7 +694,11 @@ class BackupsModule(Module):
         """
         Delete all (or some) of your backups >THIS CAN NOT BE UNDONE<
         """
-        td = string_to_timedelta(older_than)
+        try:
+            td = string_to_timedelta(older_than)
+        except OverflowError:
+            td = timedelta(seconds=0)
+
         _filter = {
             "creator": ctx.author.id,
             "timestamp": {"$lte": datetime.utcnow() - td}
@@ -808,7 +813,11 @@ class BackupsModule(Module):
 
         Get more help on the [wiki](https://wiki.xenon.bot/en/backups#automated-backups-interval).
         """
-        interval_td = string_to_timedelta(interval)
+        try:
+            interval_td = string_to_timedelta(interval)
+        except OverflowError:
+            interval_td = timedelta(hours=24)
+
         hours = max(interval_td.total_seconds() // 3600, 24)
         interval_td = timedelta(hours=hours)
 

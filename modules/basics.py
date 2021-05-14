@@ -14,15 +14,16 @@ class BasicsModule(Module):
         # Require a confirmation by the user
         await ctx.respond(
             "Are you sure that you want Xenon to leave? :(\n\n"
-            f"Type `/confirm` to confirm this action."
+            f"Type `/confirm` to confirm this action.",
+            ephemeral=True
         )
 
         try:
             await self.bot.wait_for_confirmation(ctx, timeout=30)
         except asyncio.TimeoutError:
             try:
-                await ctx.delete_response()
-            except rest.HTTPNotFound:
+                await ctx.edit_response("Cool, I will stay!")
+            except rest.HTTPException:
                 pass
             return
 
@@ -69,7 +70,7 @@ class BasicsModule(Module):
                 "`/backup interval` - Manage automated backups\n"
                 "`/template load` - Load a template from [templates.xenon.bot](https://templates.xenon.bot)\n\n"
                 "Please [visit our wiki](https://wiki.xenon.bot) or join our "
-                "[supper discord](https://xenon.bot/wiki) if you need further help.\n\n"
+                "[support discord](https://xenon.bot/wiki) if you need further help.\n\n"
                 "__Links__\n"
                 "[Wiki](https://wiki.xenon.bot) • [Templates](https://templates.xenon.bot) • "
                 "[Support](https://xenon.bot/discord) • [Twitter](https://twitter.com/xenon_bot)",
