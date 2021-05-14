@@ -57,6 +57,7 @@ class AuditLogModule(Module):
         """
         Get a list of actions that were recently taken on this server
         """
+        page = max(page, 1)
         _filter = {"guilds": ctx.guild_id}
         total_count = await self.bot.db.audit_logs.count_documents(_filter)
         if total_count == 0:
