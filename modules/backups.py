@@ -318,7 +318,7 @@ class BackupsModule(Module):
         except asyncio.TimeoutError:
             try:
                 await ctx.delete_response()
-            except rest.HTTPNotFound:
+            except rest.HTTPException:
                 pass
             return
 
@@ -389,7 +389,7 @@ class BackupsModule(Module):
                 f"Successfully **loaded the backup**.",
                 f=Format.SUCCESS
             ))
-        except rest.HTTPNotFound:
+        except rest.HTTPException:
             pass
 
         # Save ids for later use and recovery

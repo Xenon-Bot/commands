@@ -23,7 +23,7 @@ class BasicsModule(Module):
         except asyncio.TimeoutError:
             try:
                 await ctx.edit_response("Cool, I will stay!")
-            except rest.HTTPNotFound:
+            except rest.HTTPException:
                 pass
             return
 
