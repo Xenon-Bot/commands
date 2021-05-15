@@ -23,6 +23,7 @@ MAX_MESSAGE_COUNT = {
     PremiumLevel.TWO: 500,
     PremiumLevel.THREE: 1000
 }
+
 MAX_CHATLOGS = {
     PremiumLevel.NONE: 0,
     PremiumLevel.ONE: 25,
