@@ -5,7 +5,6 @@ import pymongo
 import pymongo.errors
 from datetime import datetime, timedelta
 from dbots.protos import backups_pb2
-from dbots.protos import chatlogs_pb2
 from grpclib.exceptions import GRPCError
 import grpclib
 import brotli
@@ -33,6 +32,20 @@ MAX_MESSAGE_COUNT = {
     PremiumLevel.ONE: 50,
     PremiumLevel.TWO: 100,
     PremiumLevel.THREE: 250
+}
+
+MIN_INTERVAL = {
+    PremiumLevel.NONE: 24,
+    PremiumLevel.ONE: 12,
+    PremiumLevel.TWO: 8,
+    PremiumLevel.THREE: 4
+}
+
+INTERVAL_KEEP = {
+    PremiumLevel.NONE: 1,
+    PremiumLevel.ONE: 2,
+    PremiumLevel.TWO: 4,
+    PremiumLevel.THREE: 8
 }
 
 
@@ -758,7 +771,7 @@ class BackupsModule(Module):
 
         Get more help on the [wiki](https://wiki.xenon.bot/en/backups#automated-backups-interval).
         """
-        interval = await ctx.bot.db.intervals.find_one({"guild": ctx.guild_id, "user": ctx.author.id})
+        interval = await ctx.bot.db.premium.intervals.find_one({"guild": ctx.guild_id, "user": ctx.author.id})
         if interval is None:
             await ctx.respond(**create_message(
                 "The **backup interval is** currently turned **off**.\n"
@@ -788,6 +801,16 @@ class BackupsModule(Module):
                         "inline": True
                     },
                     {
+                        "name": "Keep",
+                        "value": f"the last {interval.get('keep', 1)} backup(s)",
+                        "inline": True
+                    },
+                    {
+                        "name": "Message Count",
+                        "value": str(interval.get("chatlog", 0)),
+                        "inline": True
+                    },
+                    {
                         "name": "Last Backup",
                         "value": datetime_to_string(interval["last"]) + " UTC",
                         "inline": False
@@ -805,43 +828,49 @@ class BackupsModule(Module):
             interval=dict(
                 description="The interval in which the backups are created (e.g. every 24 hours)",
                 choices=(
-                    ("4 hours", "4h"),
-                    ("8 hours", "8h"),
-                    ("12 hours", "12h"),
-                    ("24 hours", "24h"),
-                    ("2 days", "2d"),
-                    ("3 days", "3d"),
-                    ("7 days", "3d"),
-                    ("14 days", "3d"),
-                    ("30 days", "3d")
+                        ("4 hours", "4h"),
+                        ("8 hours", "8h"),
+                        ("12 hours", "12h"),
+                        ("24 hours", "24h"),
+                        ("2 days", "2d"),
+                        ("3 days", "3d"),
+                        ("7 days", "3d"),
+                        ("14 days", "3d"),
+                        ("30 days", "3d")
                 )
-            )
+            ),
+            message_count="The count of messages to save per channel (default max)"
         )
     )
     @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(1, 10, bucket=checks.CooldownType.AUTHOR)
-    async def on(self, ctx, interval):
+    async def on(self, ctx, interval, message_count=250):
         """
         Enable your backup interval for this server
 
         Get more help on the [wiki](https://wiki.xenon.bot/en/backups#automated-backups-interval).
         """
+        max_message_count = MAX_MESSAGE_COUNT[ctx.premium_level]
+        message_count = min(message_count, max_message_count)
+
         try:
             interval_td = string_to_timedelta(interval)
         except OverflowError:
             interval_td = timedelta(hours=24)
 
-        hours = max(interval_td.total_seconds() // 3600, 24)
+        hours = max(interval_td.total_seconds() // 3600, MIN_INTERVAL[ctx.premium_level])
         interval_td = timedelta(hours=hours)
 
         now = datetime.utcnow()
-        await ctx.bot.db.intervals.update_one({"guild": ctx.guild_id, "user": ctx.author.id}, {"$set": {
+        await ctx.bot.db.premium.intervals.update_one({"guild": ctx.guild_id, "user": ctx.author.id}, {"$set": {
             "guild": ctx.guild_id,
             "user": ctx.author.id,
             "last": now,
             "next": now,
-            "interval": hours
+            "interval": hours,
+            "keep": INTERVAL_KEEP[ctx.premium_level],
+            "chatlog": message_count
         }}, upsert=True)
 
         await ctx.respond(**create_message(
@@ -871,7 +900,7 @@ class BackupsModule(Module):
 
         Get more help on the [wiki](https://wiki.xenon.bot/en/backups#automated-backups-interval).
         """
-        result = await ctx.bot.db.intervals.delete_one({"guild": ctx.guild_id, "user": ctx.author.id})
+        result = await ctx.bot.db.premium.intervals.delete_one({"guild": ctx.guild_id, "user": ctx.author.id})
         if result.deleted_count > 0:
             await ctx.respond(**create_message(
                 "Successfully **disabled your backup interval** for this server.",
@@ -994,7 +1023,7 @@ class BackupsModule(Module):
     async def interval_task(self):
         tasks = []
         semaphore = asyncio.Semaphore(5)
-        to_backup = self.bot.db.intervals.find({"next": {"$lt": datetime.utcnow()}})
+        to_backup = self.bot.db.premium.intervals.find({"next": {"$lt": datetime.utcnow()}})
         async for interval in to_backup:
             await semaphore.acquire()
 
@@ -1007,7 +1036,7 @@ class BackupsModule(Module):
                         ))
                     except GRPCError as e:
                         if e.status == grpclib.Status.NOT_FOUND:
-                            await self.bot.db.intervals.delete_many({"guild": interval["guild"]})
+                            await self.bot.db.premium.intervals.delete_many({"guild": interval["guild"]})
                             return
                         else:
                             raise
