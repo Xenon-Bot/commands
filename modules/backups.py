@@ -845,7 +845,7 @@ class BackupsModule(Module):
     @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(1, 10, bucket=checks.CooldownType.AUTHOR)
-    async def on(self, ctx, interval, message_count=250):
+    async def on(self, ctx, interval, message_count: int = 250):
         """
         Enable your backup interval for this server
 
