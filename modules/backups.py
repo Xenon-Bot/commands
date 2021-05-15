@@ -776,13 +776,23 @@ class BackupsModule(Module):
 
     @interval.sub_command(
         extends=dict(
-            interval="The interval in which the backups are created (e.g. 24h)"
+            interval=dict(
+                description="The interval in which the backups are created (e.g. every 24 hours)",
+                choices=(
+                    ("24 hours", "24h"),
+                    ("2 days", "2d"),
+                    ("3 days", "3d"),
+                    ("7 days", "3d"),
+                    ("14 days", "3d"),
+                    ("30 days", "3d")
+                )
+            )
         )
     )
     @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(1, 10, bucket=checks.CooldownType.AUTHOR)
-    async def on(self, ctx, interval="24h"):
+    async def on(self, ctx, interval):
         """
         Enable your backup interval for this server
 
