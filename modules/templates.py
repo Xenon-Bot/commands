@@ -355,6 +355,7 @@ class TemplatesModule(Module):
         if len(role_list) > 1024:
             role_list = role_list[:1000] + "\n...\n```"
 
+        description = template.get("description") or "No description"
         await ctx.respond(embeds=[{
             "title": f"Template Info - *{data.name}*",
             "color": Format.INFO.color,
@@ -371,7 +372,7 @@ class TemplatesModule(Module):
                 },
                 {
                     "name": "Description",
-                    "value": f"{template.get('description', '')[:1000]}",
+                    "value": f"{description[:1000]}",
                     "inline": False
                 },
                 {
