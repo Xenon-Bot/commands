@@ -568,6 +568,8 @@ class BackupsModule(Module):
         if props.get("encrypted"):
             properties.append("🔒Encrypted")
 
+        max_messages = max([len(c.chatlog.messages) for c in data.channels])
+
         await ctx.respond(embeds=[{
             "title": f"Backup Info - *{data.name}*",
             "color": Format.INFO.color,
@@ -576,6 +578,11 @@ class BackupsModule(Module):
                 {
                     "name": "Created At",
                     "value": datetime_to_string(props["timestamp"]),
+                    "inline": False
+                },
+                {
+                    "name": "Message Count",
+                    "value": f"{max_messages} per channel",
                     "inline": False
                 },
                 {
