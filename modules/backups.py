@@ -56,6 +56,7 @@ option_descriptions = dict(
     roles="New roles will be loaded",
     channels="New channels will be loaded",
     settings="Server settings will be updated",
+    bans="Banned members will be loaded",
     members="Member roles and nicknames will be loaded",
     messages="Some messages will be loaded"
 )
