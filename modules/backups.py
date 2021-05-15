@@ -90,7 +90,6 @@ def option_status_list(options):
 
 
 def convert_v1_to_v2(data):
-    messages = data.get("messages", {})
     channels = []
     for channel in data["channels"]:
         channels.append(
@@ -113,7 +112,6 @@ def convert_v1_to_v2(data):
                 topic=channel.get("topic"),
                 nsfw=channel.get("nsfw"),
                 rate_limit_per_user=channel.get("rate_limit_per_user"),
-                # messages=[],  # TODO: convert messages
 
                 bitrate=channel.get("bitrate"),
                 user_limit=channel.get("user_limit")
