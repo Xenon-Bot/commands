@@ -120,6 +120,10 @@ def option_status_list(options):
 def convert_v1_to_v2(data):
     channels = []
     for channel in data["channels"]:
+        chatlog_data = None
+        if "messages" in data:
+            chatlog_data = chatlog.convert_v1_to_v2(data["messages"].get(channel["id"], []))
+
         channels.append(
             backups_pb2.BackupData.Channel(
                 id=channel["id"],
@@ -140,7 +144,7 @@ def convert_v1_to_v2(data):
                 topic=channel.get("topic"),
                 nsfw=channel.get("nsfw"),
                 rate_limit_per_user=channel.get("rate_limit_per_user"),
-                chatlog=chatlog.convert_v1_to_v2(channel["messages"]) if "messages" in channel else None,
+                chatlog=chatlog_data,
 
                 bitrate=channel.get("bitrate"),
                 user_limit=channel.get("user_limit")
