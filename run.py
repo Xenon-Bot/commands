@@ -44,6 +44,7 @@ app = web.Application()
 async def prepare_bot(*_):
     await bot.setup(env.get("REDIS_URL", "redis://localhost"))
     # await bot.http.replace_guild_commands(bot.guild_id, [])
+    # await bot.http.replace_global_commands([])
     # await bot.push_commands()
 
 
