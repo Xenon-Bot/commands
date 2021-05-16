@@ -572,7 +572,12 @@ class BackupsModule(Module):
         if props.get("encrypted"):
             properties.append("🔒Encrypted")
 
-        max_messages = max([len(c.chatlog.messages) for c in data.channels])
+        message_counts = [len(c.chatlog.messages) for c in data.channels if len(c.chatlog.messages) != 0]
+        total_messages = sum(message_counts)
+        try:
+            average_messages = total_messages // len(message_counts)
+        except ZeroDivisionError:
+            average_messages = 0
 
         await ctx.respond(embeds=[{
             "title": f"Backup Info - *{data.name}*",
@@ -585,8 +590,18 @@ class BackupsModule(Module):
                     "inline": False
                 },
                 {
-                    "name": "Message Count",
-                    "value": f"{max_messages} per channel",
+                    "name": "Members",
+                    "value": f"`{len(data.members)}`",
+                    "inline": True
+                },
+                {
+                    "name": "Bans",
+                    "value": f"`{len(data.bans)}`",
+                    "inline": True
+                },
+                {
+                    "name": "Messages",
+                    "value": f"`{total_messages}` total (~`{average_messages}` per channel)",
                     "inline": False
                 },
                 {
