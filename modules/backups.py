@@ -855,15 +855,15 @@ class BackupsModule(Module):
             interval=dict(
                 description="The interval in which the backups are created (e.g. every 24 hours)",
                 choices=(
-                        ("4 hours", "4h"),
-                        ("8 hours", "8h"),
-                        ("12 hours", "12h"),
-                        ("24 hours", "24h"),
-                        ("2 days", "2d"),
-                        ("3 days", "3d"),
-                        ("7 days", "3d"),
-                        ("14 days", "3d"),
-                        ("30 days", "3d")
+                    ("4 hours", "4h"),
+                    ("8 hours", "8h"),
+                    ("12 hours", "12h"),
+                    ("24 hours", "24h"),
+                    ("2 days", "2d"),
+                    ("3 days", "3d"),
+                    ("7 days", "7d"),
+                    ("14 days", "14d"),
+                    ("30 days", "30d")
                 )
             ),
             message_count="The count of messages to save per channel (default max)"
