@@ -167,6 +167,13 @@ class SyncModule(Module):
             ), ephemeral=True)
             return
 
+        if channel.id == ctx.channel_id:
+            await ctx.respond(**create_message(
+                "You can't sync messages between the same channel.",
+                f=Format.ERROR
+            ), ephemeral=True)
+            return
+
         if channel.type not in {ChannelType.GUILD_NEWS, ChannelType.GUILD_TEXT}:
             await ctx.respond(**create_message(
                 f"The channel must be a **text channel**.",
@@ -260,14 +267,20 @@ class SyncModule(Module):
         except (rest.HTTPNotFound, rest.HTTPForbidden):
             return
 
-        if guild.id != ctx.guild_id:
-            has_admin = await self._check_admin_on(guild, ctx.author)
-            if not has_admin:
-                await ctx.respond(**create_message(
-                    f"You need **administrator permissions** in the target server.",
-                    f=Format.ERROR
-                ), ephemeral=True)
-                return
+        if ctx.guild_id == guild.id:
+            await ctx.respond(**create_message(
+                "You can't sync ban between the same servers.",
+                f=Format.ERROR
+            ), ephemeral=True)
+            return
+
+        has_admin = await self._check_admin_on(guild, ctx.author)
+        if not has_admin:
+            await ctx.respond(**create_message(
+                f"You need **administrator permissions** in the target server.",
+                f=Format.ERROR
+            ), ephemeral=True)
+            return
 
         async def _create_ban_sync(_source_id, _target_id):
             sync_id = utils.unique_id()
@@ -353,6 +366,14 @@ class SyncModule(Module):
                 f"**Can't find role_b** on server_b.",
                 f=Format.ERROR
             ))
+
+        if role_a.id == role_b.id:
+            if ctx.guild_id == guild.id:
+                await ctx.respond(**create_message(
+                    "You can't sync assignments between the same roles.",
+                    f=Format.ERROR
+                ), ephemeral=True)
+                return
 
         async def _create_role_sync(_source_guild_id, _source_role, _target_guild_id, _target_role):
             sync_id = utils.unique_id()
