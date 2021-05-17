@@ -106,7 +106,7 @@ class SyncModule(Module):
                 f=Format.SUCCESS
             ), ephemeral=True)
 
-    def _check_admin_on(self, guild, user):
+    async def _check_admin_on(self, guild, user):
         perms = Permissions.none()
         try:
             member = await self.bot.http.get_guild_member(guild, user)
@@ -176,7 +176,7 @@ class SyncModule(Module):
 
         guild = await ctx.bot.http.get_guild(channel.guild_id)
         if guild.id != ctx.guild_id:
-            has_admin = self._check_admin_on(guild, ctx.author)
+            has_admin = await self._check_admin_on(guild, ctx.author)
             if not has_admin:
                 await ctx.respond(**create_message(
                     f"You need **administrator permissions** in the target server.",
@@ -261,7 +261,7 @@ class SyncModule(Module):
             return
 
         if guild.id != ctx.guild_id:
-            has_admin = self._check_admin_on(guild, ctx.author)
+            has_admin = await self._check_admin_on(guild, ctx.author)
             if not has_admin:
                 await ctx.respond(**create_message(
                     f"You need **administrator permissions** in the target server.",
@@ -332,7 +332,7 @@ class SyncModule(Module):
             return
 
         if guild.id != ctx.guild_id:
-            has_admin = self._check_admin_on(guild, ctx.author)
+            has_admin = await self._check_admin_on(guild, ctx.author)
             if not has_admin:
                 await ctx.respond(**create_message(
                     f"You need **administrator permissions** in the target server.",
