@@ -107,6 +107,9 @@ class SyncModule(Module):
             ), ephemeral=True)
 
     async def _check_admin_on(self, guild, user):
+        if guild.owner_id == user.id:
+            return True
+
         perms = Permissions.none()
         try:
             member = await self.bot.http.get_guild_member(guild, user)
@@ -265,6 +268,11 @@ class SyncModule(Module):
         try:
             guild = await ctx.bot.http.get_guild(server_id)
         except (rest.HTTPNotFound, rest.HTTPForbidden):
+            await ctx.respond(**create_message(
+                f"**Can't find the server** with the id `{server_id}`. "
+                f"Are you sure that the bot has access to the server?",
+                f=Format.ERROR
+            ), ephemeral=True)
             return
 
         if ctx.guild_id == guild.id:
@@ -342,6 +350,11 @@ class SyncModule(Module):
         try:
             guild = await ctx.bot.http.get_guild(server_b)
         except (rest.HTTPNotFound, rest.HTTPForbidden):
+            await ctx.respond(**create_message(
+                f"**Can't find the server** with the id `{server_b}`. "
+                f"Are you sure that the bot has access to the server?",
+                f=Format.ERROR
+            ), ephemeral=True)
             return
 
         if guild.id != ctx.guild_id:
