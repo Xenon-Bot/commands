@@ -86,7 +86,7 @@ class ChatlogModule(Module):
         """
         max_chatlogs = MAX_CHATLOGS[ctx.premium_level]
         max_message_count = MAX_MESSAGE_COUNT[ctx.premium_level]
-        message_count = min(message_count, max_message_count)
+        message_count = max(0, min(message_count, max_message_count))
 
         chatlog_count = await ctx.bot.db.premium.chatlogs.count_documents({"creator": ctx.author.id})
         if chatlog_count > max_chatlogs:
@@ -141,7 +141,7 @@ class ChatlogModule(Module):
         Load a previously created chatlog in this channel
         """
         max_message_count = MAX_MESSAGE_COUNT[ctx.premium_level]
-        message_count = min(message_count, max_message_count)
+        message_count = max(0, min(message_count, max_message_count))
 
         props, data = await self._retrieve_chatlog(ctx.author.id, chatlog_id)
         if data is None:

@@ -30,7 +30,7 @@ class ClipboardModule(Module):
         Save this server to your clipboard
         """
         max_message_count = MAX_MESSAGE_COUNT[ctx.premium_level]
-        message_count = min(message_count, max_message_count)
+        message_count = max(0, min(message_count, max_message_count))
         await ctx.respond(**create_message(
             "Saving to clipboard ...",
             f=Format.PLEASE_WAIT
@@ -78,7 +78,7 @@ class ClipboardModule(Module):
         Load the server from your clipboard on this server
         """
         max_message_count = MAX_MESSAGE_COUNT[ctx.premium_level]
-        message_count = min(message_count, max_message_count)
+        message_count = max(0, min(message_count, max_message_count))
 
         raw = await ctx.bot.redis.get(f"clipboard:{ctx.author.id}")
         if raw is None:
@@ -225,7 +225,7 @@ class ClipboardModule(Module):
     @checks.cooldown(5, 30, bucket=checks.CooldownType.AUTHOR)
     async def view(self, ctx):
         """
-        Save this server to your clipboard
+        View the server on your clipboard
         """
         raw = await ctx.bot.redis.get(f"clipboard:{ctx.author.id}")
         if raw is None:
@@ -269,7 +269,7 @@ class ClipboardModule(Module):
     @checks.cooldown(5, 30, bucket=checks.CooldownType.AUTHOR)
     async def clear(self, ctx):
         """
-        Save this server to your clipboard
+        Clear your clipboard
         """
         await ctx.bot.redis.delete(f"clipboard:{ctx.author.id}")
         await ctx.respond(**create_message(

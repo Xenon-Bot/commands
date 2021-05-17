@@ -109,8 +109,8 @@ class SyncModule(Module):
     def _check_admin_on(self, guild, user):
         perms = Permissions.none()
         try:
-            member = self.bot.http.get_guild_member(guild, user)
-        except rest.HTTPNotFound:
+            member = await self.bot.http.get_guild_member(guild, user)
+        except (rest.HTTPNotFound, rest.HTTPForbidden):
             pass
         else:
             perms = guild.compute_permissions(member)
@@ -159,7 +159,7 @@ class SyncModule(Module):
         channel_id = channel_match[0]
         try:
             channel = await ctx.bot.http.get_channel(channel_id)
-        except rest.HTTPNotFound:
+        except (rest.HTTPNotFound, rest.HTTPForbidden):
             await ctx.respond(**create_message(
                 f"**Can't find the channel** with the id `{channel_id}`. "
                 f"Are you sure that the bot has access to the channel?",

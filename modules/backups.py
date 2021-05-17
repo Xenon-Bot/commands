@@ -245,7 +245,7 @@ class BackupsModule(Module):
         """
         max_backups = MAX_BACKUPS[ctx.premium_level]
         max_message_count = MAX_MESSAGE_COUNT[ctx.premium_level]
-        message_count = min(message_count, max_message_count)
+        message_count = max(0, min(message_count, max_message_count))
 
         backup_count = await ctx.bot.db.backups.count_documents({"creator": ctx.author.id})
         if backup_count > max_backups:
@@ -318,7 +318,7 @@ class BackupsModule(Module):
         Get more help on the [wiki](https://wiki.xenon.bot/backups#loading-a-backup).
         """
         max_message_count = MAX_MESSAGE_COUNT[ctx.premium_level]
-        message_count = min(message_count, max_message_count)
+        message_count = max(0, min(message_count, max_message_count))
 
         props, data = await self._retrieve_backup(ctx.author.id, backup_id)
         if data is None:
