@@ -341,7 +341,17 @@ class ChatlogModule(Module):
             ), ephemeral=True)
 
     @chatlog.sub_command(extends=dict(
-        older_than="Only chatlogs that are older than this will be deleted (e.g. 24h)"
+        older_than=dict(
+            description="Only chatlogs that are older than this will be deleted",
+            choices=(
+                    ("24 hours", "24h"),
+                    ("2 days", "2d"),
+                    ("3 days", "3d"),
+                    ("7 days", "7d"),
+                    ("14 days", "14d"),
+                    ("30 days", "30d")
+            )
+        ),
     ))
     @checks.cooldown(1, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
     async def purge(self, ctx, older_than=""):
