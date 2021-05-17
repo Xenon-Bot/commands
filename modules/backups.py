@@ -659,7 +659,17 @@ class BackupsModule(Module):
 
     @backup.sub_command(
         extends=dict(
-            older_than="Only backups that are older than this will be deleted (e.g. 24h)",
+            older_than=dict(
+                description="Only backups that are older than this will be deleted",
+                choices=(
+                        ("24 hours", "24h"),
+                        ("2 days", "2d"),
+                        ("3 days", "3d"),
+                        ("7 days", "7d"),
+                        ("14 days", "14d"),
+                        ("30 days", "30d")
+                )
+            ),
             server_name="Only backups matching the server name will be deleted (e.g. 'My Server')"
         )
     )
