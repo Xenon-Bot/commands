@@ -167,7 +167,7 @@ class TemplatesModule(Module):
             "source_id": data.id
         })
         if translator is not None:
-            ids = translator["ids"]
+            ids = translator.get("ids", {})
 
         await ctx.edit_response(**create_message(
             "**The template is now loading**. Please be patient, this can take a while!\n\n"
