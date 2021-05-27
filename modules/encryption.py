@@ -108,7 +108,6 @@ class EncryptionModule(Module):
             Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id="encryption_reset_confirm"),
             Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="encryption_reset_cancel")
         )], ephemeral=True)
-        await ctx.count_cooldown()
 
     @Module.button(name="encryption_reset_cancel")
     async def reset_cancel(self, ctx):
@@ -120,6 +119,7 @@ class EncryptionModule(Module):
 
     @Module.button(name="encryption_reset_confirm")
     async def reset_confirm(self, ctx):
+        await self.reset.cooldown.count(ctx)
         await ctx.bot.db.backups.delete_many({"creator": ctx.author.id, "encrypted": True})
         await ctx.bot.db.encryption.delete_one({"_id": ctx.author.id})
         await ctx.update(**create_message(

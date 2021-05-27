@@ -307,7 +307,6 @@ class BackupsModule(Module):
             Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id="backup_load_confirm", args=[redis_key]),
             Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="backup_load_cancel")
         )], ephemeral=True)
-        await ctx.count_cooldown()
 
     @Module.button(name="backup_load_cancel")
     async def load_cancel(self, ctx):
@@ -350,6 +349,8 @@ class BackupsModule(Module):
                 f=Format.ERROR
             ))
             return
+
+        await self.load.cooldown.count(ctx)
 
         # Create audit log entry
         await self.bot.db.audit_logs.insert_one({
@@ -772,8 +773,6 @@ class BackupsModule(Module):
             Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="backup_purge_cancel")
         )], ephemeral=True)
 
-        await ctx.count_cooldown()
-
     @Module.button(name="backup_purge_confirm")
     async def purge_confirm(self, ctx, redis_key):
         scope = await ctx.bot.redis.get(redis_key)
@@ -794,6 +793,8 @@ class BackupsModule(Module):
         }
         if server_name:
             _filter["data.name"] = server_name.strip()
+
+        await self.purge.cooldown.count(ctx)
 
         total_count = await self.bot.db.backups.count_documents({"creator": ctx.author.id})
         deleted_count = await self._delete_backups(_filter)

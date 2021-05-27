@@ -142,8 +142,6 @@ class TemplatesModule(Module):
             Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="template_load_cancel")
         )], ephemeral=True)
 
-        await ctx.count_cooldown()
-
     @Module.button(name="template_load_cancel")
     async def load_cancel(self, ctx):
         await ctx.update(**create_message(
@@ -184,6 +182,8 @@ class TemplatesModule(Module):
                 f=Format.ERROR
             ))
             return
+
+        await self.load.cooldown.count(ctx)
 
         # Create audit log entry
         await self.bot.db.audit_logs.insert_one({

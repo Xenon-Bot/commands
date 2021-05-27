@@ -40,7 +40,6 @@ class BasicsModule(Module):
         """
         Get a list of commands or more information about a specific command
         """
-
         def find_command():
             parts = command.strip(" /").split(" ")
             for cmd in ctx.bot.commands:
