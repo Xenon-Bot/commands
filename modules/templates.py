@@ -6,6 +6,7 @@ from datetime import timedelta, datetime
 from grpclib.exceptions import GRPCError
 from dbots.protos import backups_pb2
 import grpclib
+import json
 
 from .audit_logs import AuditLogType
 from .backups import option_status_list, convert_v1_to_v2, channel_tree, parse_options, option_list
@@ -24,10 +25,14 @@ class TemplatesModule(Module):
         if match:
             identifier = match.group(1)
 
+        cached = await self.bot.redis.get(f"template:{identifier}")
+        if cached is not None:
+            return json.loads(cached)
+
         try:
             data = await self.bot.http.get_template(identifier)
             guild = data["serialized_source_guild"]
-            return {
+            parsed = {
                 "name": data["name"],
                 "description": data["description"],
                 "creator_id": data["creator_id"],
@@ -68,6 +73,8 @@ class TemplatesModule(Module):
                     ],
                 }
             }
+            await self.bot.redis.setex(f"template:{identifier}", 60 * 3, json.dumps(parsed))
+            return parsed
         except rest.HTTPNotFound:
             return None
 
@@ -113,44 +120,70 @@ class TemplatesModule(Module):
             ), ephemeral=True)
             return
 
-        data = convert_v1_to_v2(template["data"])
         parsed_options = parse_options(
             ("delete_roles", "delete_channels", "roles", "channels", "settings"),
             ("delete_roles", "delete_channels", "roles", "channels", "settings"),
             options
         )
 
+        redis_key = f"template_load:{unique_id()}"
+        await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps({
+            "name_or_id": name_or_id,
+            "options": list(parsed_options)
+        }))
+
+        # Require a confirmation by the user
+        await ctx.respond(**create_message(
+            "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
+            f"{option_list(parsed_options)}",
+            f=Format.WARNING
+        ), components=[ActionRow(
+            Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id="template_load_confirm", args=[redis_key]),
+            Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="template_load_cancel")
+        )], ephemeral=True)
+
+        await ctx.count_cooldown()
+
+    @Module.button(name="template_load_cancel")
+    async def load_cancel(self, ctx):
+        await ctx.update(**create_message(
+            "The loading process has been **cancelled**.\n\n"
+            "Use `/template load` to try again.",
+            f=Format.INFO
+        ), ephemeral=True)
+
+    @Module.button(name="template_load_confirm")
+    async def load_confirm(self, ctx, redis_key):
+        scope = await ctx.bot.redis.get(redis_key)
+        if scope is None:
+            return
+
+        scope = json.loads(scope)
+        name_or_id, options = scope["name_or_id"], scope["options"]
+
+        template = await self._get_template(name_or_id)
+        if template is None:
+            await ctx.update(**create_message(
+                f"Can't find a template with the name, id or url `{name_or_id}`.\n"
+                f"Go to [templates.xenon.bot](https://templates.xenon.bot) to get a list of available templates.",
+                f=Format.ERROR
+            ))
+            return
+
+        data = convert_v1_to_v2(template["data"])
+
         role_route = rest.Route("POST", "/guilds/{guild_id}/roles", guild_id=ctx.guild_id)
         rl = await ctx.bot.http.get_bucket(role_route.bucket)
-        if rl is not None and rl.remaining < len(data.roles) and "roles" in parsed_options:
-            await ctx.respond(**create_message(
+        if rl is not None and rl.remaining < len(data.roles) and "roles" in options:
+            await ctx.update(**create_message(
                 f"Due to a **Discord limitation** the bot is **not able to load this template** at the moment.\n\n"
                 f"You have to wait **{timedelta_to_string(timedelta(seconds=rl.delta))}** "
                 f"before you can load a template containing this many roles again.\n\n"
                 f"You can also load this template without roles using"
                 f"```/template load name_or_id: {name_or_id} options: !delete_roles !roles```",
                 f=Format.ERROR
-            ), ephemeral=True)
+            ))
             return
-
-        # Require a confirmation by the user
-        await ctx.respond(**create_message(
-            "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
-            f"{option_list(parsed_options)}\n\n"
-            f"Type `/confirm` to confirm this action and continue.",
-            f=Format.WARNING
-        ))
-
-        try:
-            await self.bot.wait_for_confirmation(ctx, timeout=60)
-        except asyncio.TimeoutError:
-            try:
-                await ctx.delete_response()
-            except rest.HTTPException:
-                pass
-            return
-
-        await ctx.count_cooldown()
 
         # Create audit log entry
         await self.bot.db.audit_logs.insert_one({
@@ -169,7 +202,7 @@ class TemplatesModule(Module):
         if translator is not None:
             ids = translator.get("ids", {})
 
-        await ctx.edit_response(**create_message(
+        await ctx.update(**create_message(
             "**The template is now loading**. Please be patient, this can take a while!\n\n"
             "Use `/template status` to get the current status and `/template cancel` to cancel the process.\n\n"
             "*This message might not be updated.*",
@@ -179,7 +212,7 @@ class TemplatesModule(Module):
         try:
             replies = await self.bot.rpc.backups.Load(backups_pb2.LoadRequest(
                 guild_id=ctx.guild_id,
-                options=list(parsed_options),
+                options=list(options),
                 message_count=0,
                 data=data,
                 reason="Template loaded by " + str(ctx.author),
@@ -187,23 +220,33 @@ class TemplatesModule(Module):
             ))
         except GRPCError as e:
             if e.status == grpclib.Status.ALREADY_EXISTS:
-                await ctx.edit_response(**create_message(
+                await ctx.update(**create_message(
                     f"There is **already a loading process running** on this server.\n"
                     f"Please wait for it to finish or use `/template cancel` to stop it.",
                     f=Format.ERROR
                 ))
                 return
             elif e.status == grpclib.Status.NOT_FOUND:
-                await ctx.edit_response(**create_message(
+                await ctx.update(**create_message(
                     f"Xenon doesn't seem to be on this server, "
                     f"please click [here](https://xenon.bot/invite) to invite it again.",
                     f=Format.ERROR
                 ))
                 return
             elif e.status == grpclib.Status.RESOURCE_EXHAUSTED:
-                await ctx.edit_response(**create_message(
+                await ctx.update(**create_message(
                     f"Xenon is currently experiencing increased load and can't process your request, "
                     f"please **try again in a few minutes**.",
+                    f=Format.ERROR
+                ))
+                return
+            elif e.status == grpclib.Status.OUT_OF_RANGE:
+                await ctx.update(**create_message(
+                    f"Due to a **Discord limitation** the bot is **not able to load this template** at the moment.\n\n"
+                    f"You have to wait **{timedelta_to_string(timedelta(seconds=int(e.message)))}** "
+                    f"before you can load a template containing this many roles again.\n\n"
+                    f"You can also load this template without roles using"
+                    f"```/template load name_or_id: {name_or_id} options: !delete_roles !roles```",
                     f=Format.ERROR
                 ))
                 return
@@ -213,7 +256,7 @@ class TemplatesModule(Module):
                 raise
 
         try:
-            await ctx.edit_response(**create_message(
+            await ctx.update(**create_message(
                 f"Successfully **loaded the template**.",
                 f=Format.SUCCESS
             ))
