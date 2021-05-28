@@ -286,9 +286,10 @@ class BackupsModule(Module):
             ), ephemeral=True)
             return
 
+        allowed_options = ("delete_roles", "delete_channels", "roles", "channels", "update", "settings")
         parsed_options = parse_options(
             ("delete_roles", "delete_channels", "roles", "channels", "settings"),
-            ("delete_roles", "delete_channels", "roles", "channels", "update", "settings"),
+            allowed_options,
             options
         )
 
@@ -303,10 +304,28 @@ class BackupsModule(Module):
             "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
             f"{option_list(parsed_options)}",
             f=Format.WARNING
-        ), components=[ActionRow(
-            Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id="backup_load_confirm", args=[redis_key]),
-            Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="backup_load_cancel")
-        )], ephemeral=True)
+        ), components=[
+            ActionRow(
+                SelectMenu(*[
+                    SelectMenuOption(
+                        label=option.replace("_", " ").title(),
+                        value=option,
+                        description=option_descriptions.get(option, "").replace("*", ""),
+                        default=option in parsed_options
+                    )
+                    for option in allowed_options
+                ], max_values=len(allowed_options), custom_id="backup_load_options"),
+            ),
+            ActionRow(
+                Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id="backup_load_confirm", args=[redis_key]),
+                Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="backup_load_cancel")
+            )
+        ], ephemeral=True)
+
+    @Module.component(name="backup_load_options")
+    async def load_options(self, ctx):
+        print("options", ctx.values)
+        ctx.defer()
 
     @Module.component(name="backup_load_cancel")
     async def load_cancel(self, ctx):
