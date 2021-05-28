@@ -1,5 +1,4 @@
 from dbots.cmd import *
-from dbots import *
 import asyncio
 
 
@@ -11,24 +10,23 @@ class BasicsModule(Module):
         """
         Make the bot leave this server
         """
-        # Require a confirmation by the user
         await ctx.respond(
-            "Are you sure that you want Xenon to leave? :(\n\n"
-            f"Type `/confirm` to confirm this action.",
+            "Are you sure that you want Xenon to leave? :(",
+            components=[ActionRow(
+                Button(label="Nah, please stay!", style=ButtonStyle.SUCCESS, custom_id="leave_cancel"),
+                Button(label="Yes, please leave!", style=ButtonStyle.DANGER, custom_id="leave_confirm"),
+            )],
             ephemeral=True
         )
 
-        try:
-            await self.bot.wait_for_confirmation(ctx, timeout=30)
-        except asyncio.TimeoutError:
-            try:
-                await ctx.edit_response("Cool, I will stay!")
-            except rest.HTTPException:
-                pass
-            return
-
-        await ctx.edit_response("Bye :(")
+    @Module.component()
+    async def leave_confirm(self, ctx):
+        await ctx.update("Bye :(")
         await ctx.bot.http.leave_guild(ctx.guild_id)
+
+    @Module.component()
+    async def leave_cancel(self, ctx):
+        await ctx.update("Cool, I will stay! :)")
 
     @Module.command(
         extends=dict(
@@ -41,7 +39,6 @@ class BasicsModule(Module):
         """
         Get a list of commands or more information about a specific command
         """
-
         def find_command():
             parts = command.strip(" /").split(" ")
             for cmd in ctx.bot.commands:
@@ -92,7 +89,6 @@ class BasicsModule(Module):
         else:
             await ctx.respond(**create_message(
                 f"Unknown command: `{command}`",
-                embed=False,
                 f=Format.ERROR
             ), ephemeral=True)
 
@@ -124,25 +120,5 @@ class BasicsModule(Module):
         """
         await ctx.respond(
             f"Click [here](https://xenon.bot/discord) to join the support server.",
-            ephemeral=True
-        )
-
-    @Module.command()
-    async def confirm(self, ctx):
-        """
-        Confirm to an action
-        """
-        event = self.bot.confirmations.get(f"{ctx.channel_id}{ctx.author.id}") or asyncio.Event()
-        if event is None:
-            await ctx.respond(
-                "There is **nothing to confirm to**. Please try running your original command again.",
-                ephemeral=True
-            )
-            return
-
-        event.set()
-        event.clear()
-        await ctx.respond(
-            "Your action has been confirmed, you can delete this message.",
             ephemeral=True
         )

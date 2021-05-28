@@ -14,6 +14,7 @@ import ecies
 import base64
 import hashlib
 import binascii
+import json
 
 from .audit_logs import AuditLogType
 from . import chatlog
@@ -320,8 +321,8 @@ class BackupsModule(Module):
         max_message_count = MAX_MESSAGE_COUNT[ctx.premium_level]
         message_count = max(0, min(message_count, max_message_count))
 
-        props, data = await self._retrieve_backup(ctx.author.id, backup_id)
-        if data is None:
+        exists = await self._backup_exists(ctx.author.id, backup_id)
+        if not exists:
             await ctx.respond(**create_message(
                 f"You have **no backup** with the id `{backup_id}`.\n\n"
                 f"*Keep in mind that you can only access your own backups.*",
@@ -336,37 +337,66 @@ class BackupsModule(Module):
             options
         )
 
+        redis_key = f"backup_load:{unique_id()}"
+        await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps({
+            "backup_id": backup_id,
+            "message_count": message_count,
+            "options": list(parsed_options)
+        }))
+
+        # Require a confirmation by the user
+        await ctx.respond(**create_message(
+            "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
+            f"{option_list(parsed_options)}",
+            f=Format.WARNING
+        ), components=[ActionRow(
+            Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id="backup_load_confirm", args=[redis_key]),
+            Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="backup_load_cancel")
+        )], ephemeral=True)
+
+    @Module.component(name="backup_load_cancel")
+    async def load_cancel(self, ctx):
+        await ctx.update(**create_message(
+            "The loading process has been **cancelled**.\n\n"
+            "Use `/backup load` to try again.",
+            f=Format.INFO
+        ), ephemeral=True)
+
+    @Module.component(name="backup_load_confirm")
+    async def load_confirm(self, ctx, redis_key):
+        scope = await ctx.bot.redis.get(redis_key)
+        if scope is None:
+            await ctx.update(**create_message(
+                "You were too slow, try again with `/backup load`",
+                f=Format.ERROR
+            ))
+            return
+
+        scope = json.loads(scope)
+        backup_id, message_count, options = scope["backup_id"], scope["message_count"], scope["options"]
+
+        props, data = await self._retrieve_backup(ctx.author.id, backup_id)
+        if data is None:
+            await ctx.update(**create_message(
+                "Something went wrong, try again with `/backup load`",
+                f=Format.ERROR
+            ))
+            return
+
         role_route = rest.Route("POST", "/guilds/{guild_id}/roles", guild_id=ctx.guild_id)
         rl = await ctx.bot.http.get_bucket(role_route.bucket)
-        if rl is not None and rl.remaining < len(data.roles) and "roles" in parsed_options:
-            await ctx.respond(**create_message(
+        if rl is not None and rl.remaining < len(data.roles) and "roles" in options:
+            await ctx.update(**create_message(
                 f"Due to a **Discord limitation** the bot is **not able to load this backup** at the moment.\n\n"
                 f"You have to wait **{timedelta_to_string(timedelta(seconds=rl.delta))}** "
                 f"before you can load a backup containing this many roles again.\n\n"
                 f"You can also load this backup without roles using"
                 f"```/backup load backup_id: {backup_id} options: !delete_roles !roles```",
                 f=Format.ERROR
-            ), ephemeral=True)
+            ))
             return
 
-        # Require a confirmation by the user
-        await ctx.respond(**create_message(
-            "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
-            f"{option_list(parsed_options)}\n\n"
-            f"Type `/confirm` to confirm this action and continue.",
-            f=Format.WARNING
-        ))
-
-        try:
-            await self.bot.wait_for_confirmation(ctx, timeout=60)
-        except asyncio.TimeoutError:
-            try:
-                await ctx.delete_response()
-            except rest.HTTPException:
-                pass
-            return
-
-        await ctx.count_cooldown()
+        await self.load.cooldown.count(ctx)
 
         # Create audit log entry
         await self.bot.db.audit_logs.insert_one({
@@ -385,7 +415,7 @@ class BackupsModule(Module):
         if translator is not None:
             ids = translator.get("ids", {})
 
-        await ctx.edit_response(**create_message(
+        await ctx.update(**create_message(
             "**The backup will start loading now**. Please be patient, this can take a while!\n\n"
             "Use `/backup status` to get the current status and `/backup cancel` to cancel the process.\n\n"
             "*This message might not be updated.*",
@@ -395,7 +425,7 @@ class BackupsModule(Module):
         try:
             replies = await self.bot.rpc.backups.Load(backups_pb2.LoadRequest(
                 guild_id=ctx.guild_id,
-                options=list(parsed_options),
+                options=list(options),
                 message_count=message_count,
                 data=data,
                 reason="Backup loaded by " + str(ctx.author),
@@ -403,23 +433,33 @@ class BackupsModule(Module):
             ))
         except GRPCError as e:
             if e.status == grpclib.Status.ALREADY_EXISTS:
-                await ctx.edit_response(**create_message(
+                await ctx.update(**create_message(
                     f"There is **already a loading process running** on this server.\n"
                     f"Please wait for it to finish or use `/backup cancel` to stop it.",
                     f=Format.ERROR
                 ))
                 return
             elif e.status == grpclib.Status.NOT_FOUND:
-                await ctx.edit_response(**create_message(
+                await ctx.update(**create_message(
                     f"Xenon doesn't seem to be on this server, "
                     f"please click [here](https://xenon.bot/invite) to invite it again.",
                     f=Format.ERROR
                 ))
                 return
             elif e.status == grpclib.Status.RESOURCE_EXHAUSTED:
-                await ctx.edit_response(**create_message(
+                await ctx.update(**create_message(
                     f"Xenon is currently experiencing increased load and can't process your request, "
                     f"please **try again in a few minutes**.",
+                    f=Format.ERROR
+                ))
+                return
+            elif e.status == grpclib.Status.OUT_OF_RANGE:
+                await ctx.update(**create_message(
+                    f"Due to a **Discord limitation** the bot is **not able to load this backup** at the moment.\n\n"
+                    f"You have to wait **{timedelta_to_string(timedelta(seconds=int(e.message)))}** "
+                    f"before you can load a backup containing this many roles again.\n\n"
+                    f"You can also load this backup without roles using"
+                    f"```/backup load backup_id: {backup_id} options: !delete_roles !roles```",
                     f=Format.ERROR
                 ))
                 return
@@ -429,7 +469,7 @@ class BackupsModule(Module):
                 raise
 
         try:
-            await ctx.edit_response(**create_message(
+            await ctx.update(**create_message(
                 f"Successfully **loaded the backup**.",
                 f=Format.SUCCESS
             ))
@@ -617,24 +657,18 @@ class BackupsModule(Module):
             ]
         }], ephemeral=True)
 
-    @backup.sub_command(extends=dict(
-        page="The page to display (default 1)",
-        master_kay="The master key (only for encrypted backups)"
-    ))
-    @checks.cooldown(2, 10, bucket=checks.CooldownType.AUTHOR)
-    async def list(self, ctx, page: int = 1, master_key=None):
-        """
-        Get a list of all your previously created backups
-        """
+    async def _backup_list_message(self, user_id, page, master_key=None):
+        _filter = {"creator": user_id}
         page = max(page, 1)
-        _filter = {"creator": ctx.author.id}
         total_count = await self.bot.db.backups.count_documents(_filter)
         if total_count == 0:
-            await ctx.respond(**create_message(
-                "You **don't have any backups** yet. Use `/backup create` to create one.",
-                f=Format.INFO
-            ), ephemeral=True)
-            return
+            return dict(
+                **create_message(
+                    "You **don't have any backups** yet. Use `/backup create` to create one.",
+                    f=Format.INFO
+                ),
+                ephemeral=True
+            )
 
         if master_key is not None:
             try:
@@ -681,15 +715,41 @@ class BackupsModule(Module):
                       f"of **{total_count}** total backups"
         if contains_encrypted:
             description += f"\n\n*Some backups are encrypted, supply the master key to see the backup ids.*"
-        if total_count > page * 10:
+        if total_count > page * 10 and master_key:
             description += f"\n\nType `/backup list page: {page + 1}` for the next page"
 
-        await ctx.respond(embeds=[dict(
-            title="Backup List",
-            fields=fields,
-            color=Format.INFO.color,
-            description=f"{description}\n​"
-        )], ephemeral=True)
+        return dict(
+            embeds=[dict(
+                title="Backup List",
+                fields=fields,
+                color=Format.INFO.color,
+                description=f"{description}\n​",
+            )],
+            components=[ActionRow(
+                Button(label="Previous Page", custom_id=f"backup_list", args=[str(page - 1)],
+                       disabled=page <= 1 or master_key),
+                Button(label="Next Page", custom_id=f"backup_list", args=[str(page + 1)],
+                       disabled=total_count <= page * 10 or master_key)
+            )],
+            ephemeral=True
+        )
+
+    @backup.sub_command(extends=dict(
+        page="The page to display (default 1)",
+        master_kay="The master key (only for encrypted backups)"
+    ))
+    @checks.cooldown(2, 10, bucket=checks.CooldownType.AUTHOR)
+    async def list(self, ctx, page: int = 1, master_key=None):
+        """
+        Get a list of all your previously created backups
+        """
+        data = await self._backup_list_message(ctx.author.id, page, master_key)
+        await ctx.respond(**data)
+
+    @Module.component(name="backup_list")
+    async def list_page(self, ctx, page):
+        data = await self._backup_list_message(ctx.author.id, int(page))
+        await ctx.update(**data)
 
     @backup.sub_command(
         extends=dict(
@@ -767,27 +827,56 @@ class BackupsModule(Module):
             ), ephemeral=True)
             return
 
-        await ctx.respond(**create_message(
-            f"Are you sure that you want to delete **{delete_count}** of **{total_count}** total backups?\n\n"
-            "Type `/confirm` to confirm this action and continue.",
-            f=Format.WARNING
-        ), ephemeral=True)
+        redis_key = f"backup_purge:{unique_id()}"
+        await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps({
+            "older_than": older_than,
+            "server_name": server_name
+        }))
 
-        try:
-            await self.bot.wait_for_confirmation(ctx, timeout=60)
-        except asyncio.TimeoutError:
-            await ctx.edit_response(**create_message(
-                f"You action has **timed out**. Use `/backup purge` to try again.",
-                f=Format.INFO
-            ), ephemeral=True)
+        await ctx.respond(**create_message(
+            f"Are you sure that you want to delete **{delete_count}** of **{total_count}** total backups?",
+            f=Format.WARNING
+        ), components=[ActionRow(
+            Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id="backup_purge_confirm", args=[redis_key]),
+            Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="backup_purge_cancel")
+        )], ephemeral=True)
+
+    @Module.component(name="backup_purge_confirm")
+    async def purge_confirm(self, ctx, redis_key):
+        scope = await ctx.bot.redis.get(redis_key)
+        if scope is None:
+            await ctx.update(**create_message(
+                "You were too slow, try again with `/backup purge`",
+                f=Format.ERROR
+            ))
             return
 
-        deleted_count = await self._delete_backups(_filter)
+        scope = json.loads(scope)
+        older_than, server_name = scope["older_than"], scope["server_name"]
 
-        await ctx.count_cooldown()
-        await ctx.edit_response(**create_message(
+        td = string_to_timedelta(older_than)
+        _filter = {
+            "creator": ctx.author.id,
+            "timestamp": {"$lte": datetime.utcnow() - td}
+        }
+        if server_name:
+            _filter["data.name"] = server_name.strip()
+
+        await self.purge.cooldown.count(ctx)
+
+        total_count = await self.bot.db.backups.count_documents({"creator": ctx.author.id})
+        deleted_count = await self._delete_backups(_filter)
+        await ctx.update(**create_message(
             f"Successfully deleted **{deleted_count}** of **{total_count}** total backups.",
             f=Format.SUCCESS
+        ), ephemeral=True)
+
+    @Module.component(name="backup_purge_cancel")
+    async def purge_cancel(self, ctx):
+        await ctx.update(**create_message(
+            "Your backups have **not** been **deleted**.\n\n"
+            "Use `/backup purge` to try again.",
+            f=Format.INFO
         ), ephemeral=True)
 
     @backup.sub_command_group()
@@ -958,6 +1047,20 @@ class BackupsModule(Module):
                 f"Your backup interval is not enabled for this server.",
                 f=Format.ERROR
             ), ephemeral=True)
+
+    async def _backup_exists(self, creator, backup_id):
+        if len(backup_id) > 20:
+            try:
+                key_bytes = encryption.id_to_key(backup_id)
+            except (binascii.Error, ValueError):
+                return False
+
+            identifier = base64.b64encode(hashlib.sha3_512(key_bytes).digest()).decode()
+            doc = await self.bot.db.backups.find_one({"_id": identifier, "creator": creator}, projection=())
+            return doc is not None
+
+        doc = await self.bot.db.backups.find_one({"_id": backup_id.lower(), "creator": creator}, projection=())
+        return doc is not None
 
     async def _retrieve_backup(self, creator, backup_id):
         if len(backup_id) > 20:

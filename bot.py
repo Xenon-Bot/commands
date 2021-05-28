@@ -34,16 +34,11 @@ class Xenon(InteractionBot):
 
         self.rpc = RpcCollection()
 
-        self._receiver = aioredis.pubsub.Receiver()
-        self.confirmations = weakref.WeakValueDictionary()
+        self.component(self._delete_button, name="delete")
 
-    async def wait_for_confirmation(self, ctx, timeout=30):
-        key = f"{ctx.channel_id}{ctx.author.id}"
-        event = self.confirmations.get(key)
-        if event is None:
-            event = self.confirmations[key] = asyncio.Event()
-
-        await asyncio.wait_for(event.wait(), timeout=timeout)
+    async def _delete_button(self, ctx):
+        ctx.defer()
+        await ctx.delete_response()
 
     async def on_command_error(self, ctx, e):
         if isinstance(e, asyncio.CancelledError):
@@ -101,11 +96,3 @@ class Xenon(InteractionBot):
             payload.premium_level = premium_level
 
         return await super().execute_command(command, payload, remaining_options)
-
-    async def gateway_subscriber(self):
-        await self.redis.subscribe(
-            self._receiver.channel("gateway:events:message_reaction_add")
-        )
-        async for channel, msg in self._receiver.iter():
-            event_name = channel.name.decode().replace("gateway:events:", "")
-            self.dispatch(event_name, json.loads(msg))
