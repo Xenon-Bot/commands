@@ -10,7 +10,6 @@ class BasicsModule(Module):
         """
         Make the bot leave this server
         """
-        # Require a confirmation by the user
         await ctx.respond(
             "Are you sure that you want Xenon to leave? :(",
             components=[ActionRow(
@@ -20,12 +19,12 @@ class BasicsModule(Module):
             ephemeral=True
         )
 
-    @Module.button(name="leave_confirm")
+    @Module.component()
     async def leave_confirm(self, ctx):
         await ctx.update("Bye :(")
         await ctx.bot.http.leave_guild(ctx.guild_id)
 
-    @Module.button(name="leave_cancel")
+    @Module.component()
     async def leave_cancel(self, ctx):
         await ctx.update("Cool, I will stay! :)")
 

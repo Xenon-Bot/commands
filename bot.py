@@ -30,7 +30,7 @@ class Xenon(InteractionBot):
 
         self.rpc = RpcCollection()
 
-        self.button(self._delete_button, name="delete")
+        self.component(self._delete_button, name="delete")
 
     async def _delete_button(self, ctx):
         ctx.defer()

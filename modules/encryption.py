@@ -109,7 +109,7 @@ class EncryptionModule(Module):
             Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="encryption_reset_cancel")
         )], ephemeral=True)
 
-    @Module.button(name="encryption_reset_cancel")
+    @Module.component(name="encryption_reset_cancel")
     async def reset_cancel(self, ctx):
         await ctx.update(**create_message(
             "Your master key has **not been reset**.\n\n"
@@ -117,7 +117,7 @@ class EncryptionModule(Module):
             f=Format.INFO
         ), ephemeral=True)
 
-    @Module.button(name="encryption_reset_confirm")
+    @Module.component(name="encryption_reset_confirm")
     async def reset_confirm(self, ctx):
         await self.reset.cooldown.count(ctx)
         await ctx.bot.db.backups.delete_many({"creator": ctx.author.id, "encrypted": True})

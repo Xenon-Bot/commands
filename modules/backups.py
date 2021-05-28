@@ -308,7 +308,7 @@ class BackupsModule(Module):
             Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="backup_load_cancel")
         )], ephemeral=True)
 
-    @Module.button(name="backup_load_cancel")
+    @Module.component(name="backup_load_cancel")
     async def load_cancel(self, ctx):
         await ctx.update(**create_message(
             "The loading process has been **cancelled**.\n\n"
@@ -316,7 +316,7 @@ class BackupsModule(Module):
             f=Format.INFO
         ), ephemeral=True)
 
-    @Module.button(name="backup_load_confirm")
+    @Module.component(name="backup_load_confirm")
     async def load_confirm(self, ctx, redis_key):
         scope = await ctx.bot.redis.get(redis_key)
         if scope is None:
@@ -678,7 +678,7 @@ class BackupsModule(Module):
         data = await self._backup_list_message(ctx.author.id, page, master_key)
         await ctx.respond(**data)
 
-    @Module.button(name="backup_list")
+    @Module.component(name="backup_list")
     async def list_page(self, ctx, page):
         data = await self._backup_list_message(ctx.author.id, int(page))
         await ctx.update(**data)
@@ -773,7 +773,7 @@ class BackupsModule(Module):
             Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="backup_purge_cancel")
         )], ephemeral=True)
 
-    @Module.button(name="backup_purge_confirm")
+    @Module.component(name="backup_purge_confirm")
     async def purge_confirm(self, ctx, redis_key):
         scope = await ctx.bot.redis.get(redis_key)
         if scope is None:
@@ -803,7 +803,7 @@ class BackupsModule(Module):
             f=Format.SUCCESS
         ), ephemeral=True)
 
-    @Module.button(name="backup_purge_cancel")
+    @Module.component(name="backup_purge_cancel")
     async def purge_cancel(self, ctx):
         await ctx.update(**create_message(
             "Your backups have **not** been **deleted**.\n\n"

@@ -142,7 +142,7 @@ class TemplatesModule(Module):
             Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="template_load_cancel")
         )], ephemeral=True)
 
-    @Module.button(name="template_load_cancel")
+    @Module.component(name="template_load_cancel")
     async def load_cancel(self, ctx):
         await ctx.update(**create_message(
             "The loading process has been **cancelled**.\n\n"
@@ -150,7 +150,7 @@ class TemplatesModule(Module):
             f=Format.INFO
         ), ephemeral=True)
 
-    @Module.button(name="template_load_confirm")
+    @Module.component(name="template_load_confirm")
     async def load_confirm(self, ctx, redis_key):
         scope = await ctx.bot.redis.get(redis_key)
         if scope is None:
