@@ -152,23 +152,51 @@ class ChatlogModule(Module):
             ), ephemeral=True)
             return
 
+        redis_key = f"chatlog_load:{unique_id()}"
+        await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps({
+            "chatlog_id": chatlog_id,
+            "message_count": message_count
+        }))
+
         # Require a confirmation by the user
         await ctx.respond(**create_message(
-            "**Hey, be careful!** Are you sure that you want to load this chatlog?\n\n"
-            f"Type `/confirm` to confirm this action and continue.",
+            "**Hey, be careful!** Are you sure that you want to load this chatlog?",
             f=Format.WARNING
-        ))
+        ), components=[ActionRow(
+            Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id="chatlog_load_confirm", args=[redis_key]),
+            Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="chatlog_load_cancel")
+        )], ephemeral=True)
 
-        try:
-            await self.bot.wait_for_confirmation(ctx, timeout=60)
-        except asyncio.TimeoutError:
-            try:
-                await ctx.delete_response()
-            except rest.HTTPException:
-                pass
+    @Module.component(name="chatlog_load_cancel")
+    async def load_cancel(self, ctx):
+        await ctx.update(**create_message(
+            "The loading process has been **cancelled**.\n\n"
+            "Use `/chatlog load` to try again.",
+            f=Format.INFO
+        ), ephemeral=True)
+
+    @Module.component(name="chatlog_load_confirm")
+    async def load_confirm(self, ctx, redis_key):
+        scope = await ctx.bot.redis.get(redis_key)
+        if scope is None:
+            await ctx.update(**create_message(
+                "You were too slow, try again with `/chatlog load`",
+                f=Format.ERROR
+            ))
             return
 
-        await ctx.count_cooldown()
+        scope = json.loads(scope)
+        chatlog_id, message_count = scope["chatlog_id"], scope["message_count"]
+
+        props, data = await self._retrieve_chatlog(ctx.author.id, chatlog_id)
+        if data is None:
+            await ctx.update(**create_message(
+                f"Something went wrong, try again with `/chatlog load`",
+                f=Format.ERROR
+            ), ephemeral=True)
+            return
+
+        await self.load.cooldown.count(ctx)
 
         # Create audit log entry
         await self.bot.db.audit_logs.insert_one({
@@ -179,7 +207,7 @@ class ChatlogModule(Module):
             "extra": {"channel": ctx.channel_id}
         })
 
-        await ctx.edit_response(**create_message(
+        await ctx.update(**create_message(
             "**The chatlog will start loading now**. Please be patient, this can take a while!\n\n"
             "*This message might not be updated.*",
             f=Format.INFO
@@ -193,7 +221,7 @@ class ChatlogModule(Module):
             ))
         except GRPCError as e:
             if e.status == grpclib.Status.NOT_FOUND:
-                await ctx.edit_response(**create_message(
+                await ctx.update(**create_message(
                     f"Xenon doesn't seem to be on this server, "
                     f"please click [here](https://xenon.bot/invite) to invite it again.",
                     f=Format.ERROR
@@ -205,7 +233,7 @@ class ChatlogModule(Module):
                 raise
 
         try:
-            await ctx.edit_response(**create_message(
+            await ctx.update(**create_message(
                 f"Successfully **loaded the chatlog**.",
                 f=Format.SUCCESS
             ))
@@ -374,28 +402,51 @@ class ChatlogModule(Module):
             ), ephemeral=True)
             return
 
+        redis_key = f"chatlog_purge:{unique_id()}"
+        await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps({
+            "older_than": older_than,
+        }))
+
         await ctx.respond(**create_message(
-            f"Are you sure that you want to delete **{delete_count}** of **{total_count}** total chatlogs?\n\n"
-            "Type `/confirm` to confirm this action and continue.",
+            f"Are you sure that you want to delete **{delete_count}** of **{total_count}** total chatlogs?",
             f=Format.WARNING
+        ), components=[ActionRow(
+            Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id="chatlog_purge_confirm", args=[redis_key]),
+            Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="chatlog_purge_cancel")
+        )], ephemeral=True)
+
+    @Module.component(name="chatlog_purge_cancel")
+    async def purge_cancel(self, ctx):
+        await ctx.update(**create_message(
+            "Your chatlogs have **not** been **deleted**.\n\n"
+            "Use `/chatlog purge` to try again.",
+            f=Format.INFO
         ), ephemeral=True)
 
-        try:
-            await self.bot.wait_for_confirmation(ctx, timeout=60)
-        except asyncio.TimeoutError:
-            try:
-                await ctx.edit_response(**create_message(
-                    f"You action has **timed out**. Use `/chatlog purge` to try again.",
-                    f=Format.INFO
-                ), ephemeral=True)
-            except rest.HTTPException:
-                pass
+    @Module.component(name="chatlog_purge_confirm")
+    async def purge_confirm(self, ctx, redis_key):
+        scope = await ctx.bot.redis.get(redis_key)
+        if scope is None:
+            await ctx.update(**create_message(
+                "You were too slow, try again with `/chatlog purge`",
+                f=Format.ERROR
+            ))
             return
 
-        result = await ctx.bot.db.premium.chatlogs.delete_many(_filter)
+        scope = json.loads(scope)
+        older_than = scope["older_than"]
 
-        await ctx.count_cooldown()
-        await ctx.edit_response(**create_message(
+        td = string_to_timedelta(older_than)
+        _filter = {
+            "creator": ctx.author.id,
+            "timestamp": {"$lte": datetime.utcnow() - td}
+        }
+
+        await self.purge.cooldown.count(ctx)
+
+        total_count = await self.bot.db.premium.chatlogs.count_documents({"creator": ctx.author.id})
+        result = await ctx.bot.db.premium.chatlogs.delete_many(_filter)
+        await ctx.update(**create_message(
             f"Successfully deleted **{result.deleted_count}** of **{total_count}** total chatlogs.",
             f=Format.SUCCESS
         ))

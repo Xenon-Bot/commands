@@ -6,6 +6,7 @@ import brotli
 import asyncio
 import grpclib
 from grpclib.exceptions import GRPCError
+import json
 
 from .backups import MAX_MESSAGE_COUNT, channel_tree, parse_options, option_list
 from .audit_logs import AuditLogType
@@ -80,16 +81,13 @@ class ClipboardModule(Module):
         max_message_count = MAX_MESSAGE_COUNT[ctx.premium_level]
         message_count = max(0, min(message_count, max_message_count))
 
-        raw = await ctx.bot.redis.get(f"clipboard:{ctx.author.id}")
-        if raw is None:
+        exists = await ctx.bot.redis.exists(f"clipboard:{ctx.author.id}")
+        if not exists:
             await ctx.respond(**create_message(
                 "There is **nothing on your clipboard**. Type `/clipboard copy` to save a server to your clipboard.",
                 f=Format.ERROR
             ), ephemeral=True)
             return
-
-        data = backups_pb2.BackupData()
-        await self.bot.loop.run_in_executor(None, lambda: data.ParseFromString(brotli.decompress(raw)))
 
         parsed_options = parse_options(
             ("delete_roles", "delete_channels", "roles", "channels", "settings", "members", "bans", "messages"),
@@ -98,37 +96,68 @@ class ClipboardModule(Module):
             options
         )
 
+        redis_key = f"clipboard_paste:{unique_id()}"
+        await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps({
+            "message_count": message_count,
+            "options": list(parsed_options)
+        }))
+
+        # Require a confirmation by the user
+        await ctx.respond(**create_message(
+            "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
+            f"{option_list(parsed_options)}",
+            f=Format.WARNING
+        ), components=[ActionRow(
+            Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id="clipboard_paste_confirm", args=[redis_key]),
+            Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="clipboard_paste_cancel")
+        )], ephemeral=True)
+
+    @Module.component(name="clipboard_paste_cancel")
+    async def paste_cancel(self, ctx):
+        await ctx.update(**create_message(
+            "The loading process has been **cancelled**.\n\n"
+            "Use `/clipboard paste` to try again.",
+            f=Format.INFO
+        ), ephemeral=True)
+
+    @Module.component(name="clipboard_paste_confirm")
+    async def paste_confirm(self, ctx, redis_key):
+        scope = await ctx.bot.redis.get(redis_key)
+        if scope is None:
+            await ctx.update(**create_message(
+                "You were too slow, try again with `/backup load`",
+                f=Format.ERROR
+            ))
+            return
+
+        scope = json.loads(scope)
+        message_count, options = scope["message_count"], scope["options"]
+
+        raw = await ctx.bot.redis.get(f"clipboard:{ctx.author.id}")
+        if raw is None:
+            await ctx.respond(**create_message(
+                "You were too slow, try again with `/clipboard paste`",
+                f=Format.ERROR
+            ), ephemeral=True)
+            return
+
+        data = backups_pb2.BackupData()
+        await self.bot.loop.run_in_executor(None, lambda: data.ParseFromString(brotli.decompress(raw)))
+
         role_route = rest.Route("POST", "/guilds/{guild_id}/roles", guild_id=ctx.guild_id)
         rl = await ctx.bot.http.get_bucket(role_route.bucket)
-        if rl is not None and rl.remaining < len(data.roles) and "roles" in parsed_options:
-            await ctx.respond(**create_message(
+        if rl is not None and rl.remaining < len(data.roles) and "roles" in options:
+            await ctx.update(**create_message(
                 f"Due to a **Discord limitation** the bot is **not able to load this server** at the moment.\n\n"
                 f"You have to wait **{timedelta_to_string(timedelta(seconds=rl.delta))}** "
                 f"before you can load a server containing this many roles again.\n\n"
                 f"You can also load this server without roles using"
                 f"```/clipboard paste options: !delete_roles !roles```",
                 f=Format.ERROR
-            ), ephemeral=True)
+            ))
             return
 
-            # Require a confirmation by the user
-        await ctx.respond(**create_message(
-            "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
-            f"{option_list(parsed_options)}\n\n"
-            f"Type `/confirm` to confirm this action and continue.",
-            f=Format.WARNING
-        ))
-
-        try:
-            await self.bot.wait_for_confirmation(ctx, timeout=60)
-        except asyncio.TimeoutError:
-            try:
-                await ctx.delete_response()
-            except rest.HTTPException:
-                pass
-            return
-
-        await ctx.count_cooldown()
+        await self.paste.cooldown.count(ctx)
 
         # Create audit log entry
         await self.bot.db.audit_logs.insert_one({
@@ -145,20 +174,19 @@ class ClipboardModule(Module):
             "source_id": data.id
         })
         if translator is not None:
-            ids = translator["ids"]
+            ids = translator.get("ids", {})
 
-        await ctx.edit_response(**create_message(
+        await ctx.update(**create_message(
             "**The server will start loading now**. Please be patient, this can take a while!\n\n"
             "Use `/backup status` to get the current status and `/backup cancel` to cancel the process.\n\n"
             "*This message might not be updated.*",
             f=Format.INFO
         ))
-        await asyncio.sleep(10)
 
         try:
             replies = await self.bot.rpc.backups.Load(backups_pb2.LoadRequest(
                 guild_id=ctx.guild_id,
-                options=list(parsed_options),
+                options=list(options),
                 message_count=message_count,
                 data=data,
                 reason="Backup loaded by " + str(ctx.author),
@@ -166,21 +194,21 @@ class ClipboardModule(Module):
             ))
         except GRPCError as e:
             if e.status == grpclib.Status.ALREADY_EXISTS:
-                await ctx.edit_response(**create_message(
+                await ctx.update(**create_message(
                     f"There is **already a loading process running** on this server.\n"
                     f"Please wait for it to finish or use `/backup cancel` to stop it.",
                     f=Format.ERROR
                 ))
                 return
             elif e.status == grpclib.Status.NOT_FOUND:
-                await ctx.edit_response(**create_message(
+                await ctx.update(**create_message(
                     f"Xenon doesn't seem to be on this server, "
                     f"please click [here](https://xenon.bot/invite) to invite it again.",
                     f=Format.ERROR
                 ))
                 return
             elif e.status == grpclib.Status.RESOURCE_EXHAUSTED:
-                await ctx.edit_response(**create_message(
+                await ctx.update(**create_message(
                     f"Xenon is currently experiencing increased load and can't process your request, "
                     f"please **try again in a few minutes**.",
                     f=Format.ERROR
@@ -192,7 +220,7 @@ class ClipboardModule(Module):
                 raise
 
         try:
-            await ctx.edit_response(**create_message(
+            await ctx.update(**create_message(
                 f"Successfully **loaded the server from the clipboard**.",
                 f=Format.SUCCESS
             ))
