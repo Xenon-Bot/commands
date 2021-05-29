@@ -3,7 +3,7 @@ from os import environ as env
 from aiohttp import web
 from concurrent.futures import ThreadPoolExecutor
 import sentry_sdk
-from dbots.cmd import Format
+from dbots.cmd import *
 
 from bot import Xenon
 from modules import backups, basics, settings, audit_logs, templates, admin, clone, encryption, chatlog, clipboard, sync
@@ -14,7 +14,10 @@ if env.get("SENTRY"):
         traces_sample_rate=0.1
     )
 
-Format.ERROR.footer = "[Support](https://xenon.bot/discord) • [FAQ](https://wiki.xenon.bot/faq)"
+Format.ERROR.components = [ActionRow(
+    Button(label="Wiki", url="https://wiki.xenon.bot", emoji="📚"),
+    Button(label="Support", url="https://xenon.bot/discord", emoji="❔")
+)]
 
 bot = Xenon(
     public_key=env.get("PUBLIC_KEY"),

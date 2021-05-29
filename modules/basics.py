@@ -66,11 +66,14 @@ class BasicsModule(Module):
                 "`/backup list` - List all your backups\n"
                 "`/backup interval` - Manage automated backups\n"
                 "`/template load` - Load a template from [templates.xenon.bot](https://templates.xenon.bot)\n\n"
-                "Please [visit our wiki](https://wiki.xenon.bot) or join our "
-                "[support discord](https://xenon.bot/wiki) if you need further help.\n\n"
-                "__Links__\n"
-                "[Wiki](https://wiki.xenon.bot) • [Templates](https://templates.xenon.bot) • "
-                "[Support](https://xenon.bot/discord) • [Twitter](https://twitter.com/xenon_bot)",
+                "Please visit our wiki or join our support discord if you need further help.\n​",
+                components=[ActionRow(
+                    Button(label="Wiki", url="https://wiki.xenon.bot", emoji="📚"),
+                    Button(label="Support", url="https://xenon.bot/discord", emoji="❔"),
+                    Button(label="Templates", url="https://templates.xenon.bot", emoji="🖼️"),
+                    Button(label="Twitter", url="https://twitter.com/xenon_bot", emoji="🐦"),
+                    Button(label="Premium", url="https://xenon.bot/patreon", emoji="⭐")
+                )],
                 ephemeral=True
             )
             return
