@@ -125,7 +125,7 @@ class ClipboardModule(Module):
         scope = await ctx.bot.redis.get(redis_key)
         if scope is None:
             await ctx.update(**create_message(
-                "You were too slow, try again with `/backup load`",
+                "You were too slow, try again with `/clipboard paste`",
                 f=Format.ERROR
             ))
             return
