@@ -166,26 +166,26 @@ def convert_v1_to_v2(data):
     )
 
 
-def parse_options(default, option_string):
+def parse_options(default, allowed, option_string):
     options = set(default)
 
     for option in option_string.lower().replace("-", "_").split(" "):
         if option == "!*":
             options.clear()
         elif option == "*":
-            options = set(ALLOWED_OPTIONS)
+            options = set(allowed)
         elif option.startswith("!"):
             try:
                 options.remove(option[1:])
             except KeyError:
                 pass
-        elif option in ALLOWED_OPTIONS:
+        elif option in allowed:
             options.add(option)
 
     return options
 
 
-def create_warning_message(options, redis_key):
+def create_warning_message(options, redis_key, prefix="backup_"):
     return dict(
         **create_message(
             "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
@@ -204,12 +204,12 @@ def create_warning_message(options, redis_key):
                     for option in ALLOWED_OPTIONS
                 ],
                            max_values=len(ALLOWED_OPTIONS), placeholder="Select Loading Options",
-                           custom_id="backup_load_options", args=[redis_key]),
+                           custom_id=f"{prefix}load_options", args=[redis_key]),
             ),
             ActionRow(
-                Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id="backup_load_confirm",
+                Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id=f"{prefix}load_confirm",
                        args=[redis_key]),
-                Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="backup_load_cancel", args=[redis_key])
+                Button(label="Cancel", style=ButtonStyle.DANGER, custom_id=f"{prefix}load_cancel", args=[redis_key])
             )
         ]
     )
@@ -319,6 +319,7 @@ class BackupsModule(Module):
 
         parsed_options = parse_options(
             ("delete_roles", "delete_channels", "roles", "channels", "settings"),
+            ALLOWED_OPTIONS,
             options
         )
 

@@ -9,7 +9,10 @@ import grpclib
 import json
 
 from .audit_logs import AuditLogType
-from .backups import option_status_list, convert_v1_to_v2, channel_tree, parse_options, option_list
+from .backups import option_status_list, convert_v1_to_v2, channel_tree, parse_options, option_list, \
+    create_warning_message
+
+ALLOWED_OPTIONS = ("delete_roles", "delete_channels", "roles", "channels", "settings")
 
 
 class TemplatesModule(Module):
@@ -122,7 +125,7 @@ class TemplatesModule(Module):
 
         parsed_options = parse_options(
             ("delete_roles", "delete_channels", "roles", "channels", "settings"),
-            ("delete_roles", "delete_channels", "roles", "channels", "settings"),
+            ALLOWED_OPTIONS,
             options
         )
 
@@ -132,18 +135,26 @@ class TemplatesModule(Module):
             "options": list(parsed_options)
         }))
 
-        # Require a confirmation by the user
-        await ctx.respond(**create_message(
-            "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
-            f"{option_list(parsed_options)}",
-            f=Format.WARNING
-        ), components=[ActionRow(
-            Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id="template_load_confirm", args=[redis_key]),
-            Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="template_load_cancel")
-        )], ephemeral=True)
+        await ctx.respond(**create_warning_message(parsed_options, redis_key, prefix="template_"), ephemeral=True)
+
+    @Module.component(name="template_load_options")
+    async def load_options(self, ctx, redis_key):
+        scope = await ctx.bot.redis.get(redis_key)
+        if scope is None:
+            await ctx.update(**create_message(
+                "You were too slow, try again with `/backup load`",
+                f=Format.ERROR
+            ))
+            return
+
+        scope = json.loads(scope)
+        scope["options"] = [o for o in ctx.values if o in ALLOWED_OPTIONS]
+        await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps(scope))
+        await ctx.update(**create_warning_message(scope["options"], redis_key, prefix="template_"))
 
     @Module.component(name="template_load_cancel")
-    async def load_cancel(self, ctx):
+    async def load_cancel(self, ctx, redis_key):
+        await ctx.bot.redis.delete(redis_key)
         await ctx.update(**create_message(
             "The loading process has been **cancelled**.\n\n"
             "Use `/template load` to try again.",
