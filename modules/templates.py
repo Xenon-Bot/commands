@@ -135,7 +135,8 @@ class TemplatesModule(Module):
         # Require a confirmation by the user
         await ctx.respond(**create_message(
             "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
-            f"{option_list(parsed_options)}",
+            f"{option_list(parsed_options)}\n\n"
+            f"*If you don't see the buttons below this message please update your discord app.*",
             f=Format.WARNING
         ), components=[ActionRow(
             Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id="template_load_confirm", args=[redis_key]),

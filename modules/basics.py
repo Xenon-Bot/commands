@@ -113,6 +113,9 @@ class BasicsModule(Module):
         """
         await ctx.respond(
             f"Click [here](https://xenon.bot/invite) to **invite Xenon** to your server.",
+            components=[ActionRow(
+                Button(label="Invite Xenon", url="https://xenon.bot/invite"),
+            )],
             ephemeral=True
         )
 
@@ -123,5 +126,22 @@ class BasicsModule(Module):
         """
         await ctx.respond(
             f"Click [here](https://xenon.bot/discord) to join the support server.",
+            components=[ActionRow(
+                Button(label="Support Server", url="https://xenon.bot/discord"),
+            )],
+            ephemeral=True
+        )
+
+    @Module.command()
+    async def vote(self, ctx):
+        """
+        Support Xenon by voting for it
+        """
+        await ctx.respond(
+            f"Voting is free and helps us to reach more people. You can vote every 12 hours.\n"
+            f"Click [here](https://top.gg/bot/416358583220043796/vote) to vote for Xenon.",
+            components=[ActionRow(
+                Button(label="Vote on top.gg", url="https://top.gg/bot/416358583220043796/vote"),
+            )],
             ephemeral=True
         )
