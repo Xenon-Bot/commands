@@ -82,8 +82,10 @@ class Xenon(InteractionBot):
         await self.redis.hincrby("cmd:commands", command.full_name, 1)
 
         raw_premium_level = await self.redis.hget("premium:users", payload.author.id) or "0"
-        premium_level = PremiumLevel(int(raw_premium_level))
-        if premium_level == PremiumLevel.NONE:
+        payload.premium_level = PremiumLevel(int(raw_premium_level))
+
+        allowed_commands = {"settings", "leave", "ping", "support", "audit"}
+        if payload.premium_level == PremiumLevel.NONE and command.name not in allowed_commands:
             return InteractionResponse.message(
                 content="You **need** to buy **Xenon Premium** to be able to use this bot and its commands.\n\n"
                         "You can **buy Premium [here](https://patreon.com/merlinfuchs)** and "
@@ -92,7 +94,5 @@ class Xenon(InteractionBot):
                         "[here](https://wiki.xenon.bot/premium#redeem-perks)*.",
                 ephemeral=True
             )
-        else:
-            payload.premium_level = premium_level
 
         return await super().execute_command(command, payload, remaining_options)
