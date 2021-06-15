@@ -368,17 +368,19 @@ class SyncModule(Module):
 
         role_a = ctx.resolved.roles.get(role_a)
         if role_a is None:
-            await ctx.respod(**create_message(
+            await ctx.respond(**create_message(
                 f"**Can't find role_a** on this server.",
                 f=Format.ERROR
             ))
+            return
 
         role_b = guild.get_role(role_b)
         if role_b is None:
-            await ctx.respod(**create_message(
+            await ctx.respond(**create_message(
                 f"**Can't find role_b** on server_b.",
                 f=Format.ERROR
             ))
+            return
 
         if role_a.id == role_b.id:
             if ctx.guild_id == guild.id:
@@ -410,7 +412,7 @@ class SyncModule(Module):
                 ), ephemeral=True)
 
             else:
-                await ctx.f_send(**create_message(
+                await ctx.respond(**create_message(
                     f"Successfully **created sync** from `{_source_role.name}` (`{_source_role.id}`) to "
                     f"`{_target_role.name}` (`{_target_role.id}`) with the id `{sync_id.upper()}`",
                     f=Format.SUCCESS
