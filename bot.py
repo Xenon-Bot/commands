@@ -84,8 +84,10 @@ class Xenon(InteractionBot):
         raw_premium_level = await self.redis.hget("premium:users", payload.author.id) or "0"
         payload.premium_level = PremiumLevel(int(raw_premium_level))
 
-        allowed_commands = {"settings", "leave", "ping", "support", "audit"}
-        if payload.premium_level == PremiumLevel.NONE and command.name not in allowed_commands:
+        allowed_commands = {
+            "settings show", "settings permissions", "settings reset", "leave", "ping", "support", "audit logs"
+        }
+        if payload.premium_level == PremiumLevel.NONE and command.full_name not in allowed_commands:
             return InteractionResponse.message(
                 content="You **need** to buy **Xenon Premium** to be able to use this bot and its commands.\n\n"
                         "You can **buy Premium [here](https://patreon.com/merlinfuchs)** and "
