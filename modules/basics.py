@@ -65,7 +65,7 @@ class BasicsModule(Module):
                 "`/backup load` - Load a previously created backup\n"
                 "`/backup list` - List all your backups\n"
                 "`/backup interval` - Manage automated backups\n"
-                "`/template load` - Load a template from [templates.xenon.bot](https://templates.xenon.bot)\n\n"
+                "`/template load` - Load a template from [templates.xenon.bot](<https://templates.xenon.bot>)\n\n"
                 "Please visit our wiki or join our support discord if you need further help.\n​",
                 components=[ActionRow(
                     Button(label="Wiki", url="https://wiki.xenon.bot", emoji="📚"),
@@ -112,7 +112,7 @@ class BasicsModule(Module):
         Invite Xenon to your server
         """
         await ctx.respond(
-            f"Click [here](https://xenon.bot/invite) to **invite Xenon** to your server.",
+            f"Click [here](<https://xenon.bot/invite>) to **invite Xenon** to your server.",
             components=[ActionRow(
                 Button(label="Invite Xenon", url="https://xenon.bot/invite"),
             )],
@@ -125,7 +125,7 @@ class BasicsModule(Module):
         Join the support server and get some help
         """
         await ctx.respond(
-            f"Click [here](https://xenon.bot/discord) to join the support server.",
+            f"Click [here](<https://xenon.bot/discord>) to join the support server.",
             components=[ActionRow(
                 Button(label="Support Server", url="https://xenon.bot/discord"),
             )],
@@ -139,7 +139,7 @@ class BasicsModule(Module):
         """
         await ctx.respond(
             f"Voting is free and helps us to reach more people. You can vote every 12 hours.\n"
-            f"Click [here](https://top.gg/bot/416358583220043796/vote) to vote for Xenon.",
+            f"Click [here](<https://top.gg/bot/416358583220043796/vote>) to vote for Xenon.",
             components=[ActionRow(
                 Button(label="Vote on top.gg", url="https://top.gg/bot/416358583220043796/vote"),
             )],
