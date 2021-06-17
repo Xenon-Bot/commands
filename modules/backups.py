@@ -954,15 +954,15 @@ class BackupsModule(Module):
             interval=dict(
                 description="The interval in which the backups are created (e.g. every 24 hours)",
                 choices=(
-                    ("4 hours", "4h"),
-                    ("8 hours", "8h"),
-                    ("12 hours", "12h"),
-                    ("24 hours", "24h"),
-                    ("2 days", "2d"),
-                    ("3 days", "3d"),
-                    ("7 days", "7d"),
-                    ("14 days", "14d"),
-                    ("30 days", "30d")
+                        ("4 hours", "4h"),
+                        ("8 hours", "8h"),
+                        ("12 hours", "12h"),
+                        ("24 hours", "24h"),
+                        ("2 days", "2d"),
+                        ("3 days", "3d"),
+                        ("7 days", "7d"),
+                        ("14 days", "14d"),
+                        ("30 days", "30d")
                 )
             ),
             message_count="The count of messages to save per channel (default max)"
@@ -1159,7 +1159,7 @@ class BackupsModule(Module):
 
         return result.deleted_count + count
 
-    # @Module.task(minutes=20)
+    @Module.task(minutes=5)
     async def interval_task(self):
         tasks = []
         semaphore = asyncio.Semaphore(5)
@@ -1172,7 +1172,8 @@ class BackupsModule(Module):
                     try:
                         replies = await self.bot.rpc.backups.Create(backups_pb2.CreateRequest(
                             guild_id=interval["guild"],
-                            options=["roles", "channels", "settings"]
+                            options=["roles", "channels", "settings", "members", "bans", "messages"],
+                            message_count=interval.get("chatlog", 0)
                         ))
                     except GRPCError as e:
                         if e.status == grpclib.Status.NOT_FOUND:
@@ -1185,14 +1186,33 @@ class BackupsModule(Module):
                     if data is None:
                         return
 
-                    await self._delete_backups({
-                        "creator": interval["user"],
+                    keep = interval.get("keep", 1)
+                    existing_count = 0
+                    async for backup in self.bot.db.backups.find({
                         "data.id": interval["guild"],
-                        "interval": True
-                    })
+                        "creator": interval["user"],
+                        "interval": True,
+                    }, sort=[("timestamp", pymongo.DESCENDING)], projection=[]):
+                        existing_count += 1
+                        if existing_count >= keep:
+                            await self.bot.db.backups.delete_one({"_id": backup["_id"]})
+
                     await self._store_backup(interval["user"], data, interval=True)
                 finally:
                     semaphore.release()
+
+                    _next = interval["next"]
+                    try:
+                        while _next < datetime.utcnow():
+                            _next += timedelta(hours=interval["interval"])
+                    except OverflowError:
+                        # interval length goes brrr
+                        await self.bot.db.premium.intervals.delete_one({"_id": interval["_id"]})
+
+                    await self.bot.db.premium.intervals.update_one({"_id": interval["_id"]}, {"$set": {
+                        "next": _next,
+                        "last": datetime.utcnow()
+                    }})
 
             tasks.append(self.bot.loop.create_task(_run_interval()))
 
