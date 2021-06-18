@@ -1170,6 +1170,19 @@ class BackupsModule(Module):
 
             async def _run_interval():
                 try:
+                    _next = interval["next"]
+                    try:
+                        while _next < datetime.utcnow():
+                            _next += timedelta(hours=max(interval["interval"], 1))
+                    except OverflowError:
+                        # interval length goes brrr
+                        await self.bot.db.premium.intervals.delete_one({"_id": interval["_id"]})
+
+                    await self.bot.db.premium.intervals.update_one({"_id": interval["_id"]}, {"$set": {
+                        "next": _next,
+                        "last": datetime.utcnow()
+                    }})
+
                     try:
                         replies = await self.bot.rpc.backups.Create(backups_pb2.CreateRequest(
                             guild_id=interval["guild"],
@@ -1201,19 +1214,6 @@ class BackupsModule(Module):
                     await self._store_backup(interval["user"], data, interval=True)
                 finally:
                     semaphore.release()
-
-                    _next = interval["next"]
-                    try:
-                        while _next < datetime.utcnow():
-                            _next += timedelta(hours=interval["interval"])
-                    except OverflowError:
-                        # interval length goes brrr
-                        await self.bot.db.premium.intervals.delete_one({"_id": interval["_id"]})
-
-                    await self.bot.db.premium.intervals.update_one({"_id": interval["_id"]}, {"$set": {
-                        "next": _next,
-                        "last": datetime.utcnow()
-                    }})
 
             tasks.append(self.bot.loop.create_task(_run_interval()))
 
