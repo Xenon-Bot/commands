@@ -7,46 +7,9 @@ import traceback
 import json
 from datetime import datetime
 
-ADMIN_GUILD_ID = env.get("ADMIN_GUILD_ID", "496683369665658880")
-
 
 class AdminModule(Module):
-    # @Module.command()
-    async def debug(self, ctx):
-        """
-        Manage the admin commands for a server
-        """
-
-    # @debug.sub_command()
-    @guild_only
-    @checks.is_bot_owner
-    async def enable(self, ctx):
-        """
-        Register the debug commands on this server
-        """
-        await self.bot.http.replace_guild_commands(ctx.guild_id, [
-            c.to_payload() for c in self.commands
-            if not c.register
-        ])
-        await ctx.respond(**create_message(
-            f"Admin commands are now available on the server with the id `{ctx.guild_id}`",
-            f=Format.SUCCESS
-        ), ephemeral=True)
-
-    # @debug.sub_command()
-    @guild_only
-    @checks.is_bot_owner
-    async def disable(self, ctx):
-        """
-        Unregister the debug commands on this server
-        """
-        await self.bot.http.replace_guild_commands(ctx.guild_id, [])
-        await ctx.respond(**create_message(
-            f"Admin commands are no longer available on the server with the id `{ctx.guild_id}`",
-            f=Format.SUCCESS
-        ), ephemeral=True)
-
-    # @Module.command(visible=False)
+    @Module.command()
     @checks.is_bot_owner
     async def maintenance(self, ctx):
         """
@@ -67,7 +30,7 @@ class AdminModule(Module):
                 f=Format.SUCCESS
             ), ephemeral=True)
 
-    # @Module.command(visible=False)
+    @Module.command()
     @checks.is_bot_owner
     async def eval(self, ctx, expression):
         """
@@ -96,7 +59,7 @@ class AdminModule(Module):
                 f=Format.SUCCESS
             ), ephemeral=True)
 
-    # @Module.command(visible=False)
+    @Module.command()
     @checks.is_bot_owner
     async def exec(self, ctx, snippet):
         """
@@ -135,7 +98,7 @@ class AdminModule(Module):
                 f=Format.SUCCESS
             ), ephemeral=True)
 
-    # @Module.command(visible=False)
+    @Module.command()
     @checks.is_bot_owner
     async def redis(self, ctx, cmd):
         """
@@ -148,7 +111,7 @@ class AdminModule(Module):
             f=Format.SUCCESS
         ), ephemeral=True)
 
-    @Module.command(visible=True)
+    @Module.command()
     @checks.is_bot_owner
     async def error(self, ctx, error_id: str.lower = None, delete: bool = False):
         """
@@ -235,9 +198,130 @@ class AdminModule(Module):
         if delete:
             await ctx.bot.redis.delete(f"cmd:errors:{error_id}")
 
-    # @Module.command(visible=False)
+    @Module.command()
     @checks.is_bot_owner
     async def blacklist(self, ctx):
         """
         Manage the blacklist
         """
+
+    @blacklist.sub_command_group(name="add")
+    @checks.is_bot_owner
+    async def blacklist_add(self, ctx):
+        """
+        Add a user or server to the blacklist
+        """
+
+    @blacklist_add.sub_command(name="user")
+    @checks.is_bot_owner
+    async def blacklist_add_user(self, ctx, user: CommandOptionType.USER, reason):
+        """
+        Add a user to the blacklist
+        """
+        await ctx.bot.db.blacklist.replace_one({"_id": user}, {
+            "_id": user,
+            "guild": False,
+            "timestamp": datetime.utcnow(),
+            "staff": ctx.author.id,
+            "reason": reason
+        }, upsert=True)
+        await ctx.respond(**create_message(
+            f"Successfully **added <@{user}> to the blacklist**.",
+            f=Format.SUCCESS
+        ), ephemeral=True)
+
+    @blacklist_add.sub_command(name="server")
+    @checks.is_bot_owner
+    async def blacklist_add_guild(self, ctx, server_id, reason):
+        """
+        Add a server to the blacklist
+        """
+        await ctx.bot.db.blacklist.replace_one({"_id": server_id}, {
+            "_id": server_id,
+            "guild": True,
+            "timestamp": datetime.utcnow(),
+            "staff": ctx.author.id,
+            "reason": reason
+        }, upsert=True)
+        await ctx.respond(**create_message(
+            f"Successfully **added the server with the id `{server_id}` to the blacklist**.",
+            f=Format.SUCCESS
+        ), ephemeral=True)
+
+    @blacklist.sub_command_group(name="remove")
+    @checks.is_bot_owner
+    async def blacklist_remove(self, ctx):
+        """
+        Remove a user or server from the blacklist
+        """
+
+    @blacklist_remove.sub_command(name="user")
+    @checks.is_bot_owner
+    async def blacklist_remove_user(self, ctx, user: CommandOptionType.USER):
+        """
+        Remove a user from the blacklist
+        """
+        await ctx.bot.db.blacklist.delete_one({"_id": user})
+        await ctx.respond(**create_message(
+            f"Successfully **removed <@{user}> from the blacklist**.",
+            f=Format.SUCCESS
+        ), ephemeral=True)
+
+    @blacklist_remove.sub_command(name="server")
+    @checks.is_bot_owner
+    async def blacklist_remove_guild(self, ctx, server_id):
+        """
+        Remove a server from the blacklist
+        """
+        await ctx.bot.db.blacklist.delete_one({"_id": server_id, "guild": True})
+        await ctx.respond(**create_message(
+            f"Successfully **added the server with the id `{server_id}` to the blacklist**.",
+            f=Format.SUCCESS
+        ), ephemeral=True)
+
+    @blacklist.sub_command_group(name="show")
+    @checks.is_bot_owner
+    async def blacklist_show(self, ctx):
+        """
+        Show a user or server from the blacklist
+        """
+
+    @blacklist_show.sub_command(name="user")
+    @checks.is_bot_owner
+    async def blacklist_show_user(self, ctx, user: CommandOptionType.USER):
+        """
+        Show a user from the blacklist
+        """
+        entry = await ctx.bot.db.blacklist.find_one({"_id": user})
+        if entry is None:
+            await ctx.respond(**create_message(
+                "This user is not blacklisted.",
+                f=Format.ERROR
+            ), ephemeral=True)
+            return
+
+        await ctx.respond(**create_message(
+            f"The user <@{user}> has been blacklisted because of the following reason:"
+            f"```{entry['reason']}```",
+            f=Format.SUCCESS
+        ), ephemeral=True)
+
+    @blacklist_show.sub_command(name="server")
+    @checks.is_bot_owner
+    async def blacklist_show_guild(self, ctx, server_id):
+        """
+        Show a server from the blacklist
+        """
+        entry = await ctx.bot.db.blacklist.find_one({"_id": server_id, "guild": True})
+        if entry is None:
+            await ctx.respond(**create_message(
+                "This server is not blacklisted.",
+                f=Format.ERROR
+            ), ephemeral=True)
+            return
+
+        await ctx.respond(**create_message(
+            f"The server with the id `{server_id}` has been blacklisted because of the following reason:"
+            f"```{entry['reason']}```",
+            f=Format.SUCCESS
+        ), ephemeral=True)
