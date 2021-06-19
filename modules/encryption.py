@@ -35,7 +35,7 @@ class EncryptionModule(Module):
         Manage backup and chatlog encryption
         """
 
-    @encryption.sub_command(visible=False, ephemeral=True)
+    @encryption.sub_command(ephemeral=True)
     @checks.cooldown(1, 60, bucket=checks.CooldownType.AUTHOR)
     async def enable(self, ctx):
         """

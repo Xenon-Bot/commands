@@ -81,6 +81,25 @@ class Xenon(InteractionBot):
     async def execute_command(self, command, payload, remaining_options):
         await self.redis.hincrby("cmd:commands", command.full_name, 1)
 
+        blacklist = await self.db.blacklist.find_one({"_id": payload.author.id})
+        if blacklist is None and payload.guild_id:
+            blacklist = await self.db.blacklist.find_one({"_id": payload.guild_id})
+
+        if blacklist is not None:
+            if blacklist.get("guild"):
+                return InteractionResponse.message(**create_message(
+                    "This server is **no longer allowed to use this bot** for the following reason:"
+                    f"```{blacklist['reason']}```",
+                    f=Format.ERROR
+                ), ephemeral=True)
+            else:
+                return InteractionResponse.message(**create_message(
+                    "You are **no longer allowed to use this bot** for the following reason:"
+                    f"```{blacklist['reason']}```",
+                    f=Format.ERROR
+                ), ephemeral=True)
+
+
         raw_premium_level = await self.redis.hget("premium:users", payload.author.id) or "0"
         payload.premium_level = PremiumLevel(int(raw_premium_level))
 
