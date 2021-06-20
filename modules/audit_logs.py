@@ -2,6 +2,7 @@ from enum import IntEnum
 import pymongo
 from dbots.cmd import *
 from dbots import *
+from datetime import datetime, timedelta
 
 
 class AuditLogType(IntEnum):
@@ -39,7 +40,18 @@ text_formats = {
 
 
 class AuditLogModule(Module):
-    # TODO: audit log retention
+    async def post_setup(self):
+        await self.bot.db.audit_logs.create_index([("timestamp", pymongo.ASCENDING)])
+        await self.bot.db.audit_logs.create_index([("user", pymongo.ASCENDING)])
+        await self.bot.db.audit_logs.create_index([("guilds", pymongo.ASCENDING)])
+
+    @Module.task(hours=1)
+    async def audit_log_retention(self):
+        await self.bot.db.audit_logs.delete_many({
+            "timestamp": {
+                "$lte": datetime.utcnow() - timedelta(days=365)
+            }
+        })
 
     @Module.command()
     async def audit(self, ctx):
