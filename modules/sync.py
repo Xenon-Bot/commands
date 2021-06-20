@@ -23,6 +23,14 @@ class SyncType(IntEnum):
 
 
 class SyncModule(Module):
+    async def post_setup(self):
+        await self.bot.db.premium.syncs.create_index(
+            [("type", pymongo.ASCENDING), ("target", pymongo.ASCENDING), ("source", pymongo.ASCENDING)],
+            unique=True
+        )
+        await self.bot.db.premium.syncs.create_index([("guilds", pymongo.ASCENDING)])
+        await self.bot.db.premium.syncs.create_index([("target_guild", pymongo.ASCENDING)])
+
     @Module.command()
     async def sync(self, ctx):
         """

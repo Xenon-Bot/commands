@@ -64,6 +64,10 @@ def convert_v1_to_v2(data):
 
 
 class ChatlogModule(Module):
+    async def post_setup(self):
+        await self.bot.db.premium.chatlogs.create_index([("creator", pymongo.ASCENDING)])
+        await self.bot.db.premium.chatlogs.create_index([("timestamp", pymongo.ASCENDING)])
+
     @Module.command()
     async def chatlog(self, ctx):
         """

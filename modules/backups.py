@@ -223,7 +223,15 @@ class BackupsModule(Module):
         self.grid_fs = AsyncIOMotorGridFSBucket(self.bot.db, "backup_chunks", chunk_size_bytes=8000000)
 
     async def post_setup(self):
-        pass
+        await self.bot.db.backups.create_index([("creator", pymongo.ASCENDING)])
+        await self.bot.db.backups.create_index([("timestamp", pymongo.ASCENDING)])
+        await self.bot.db.backups.create_index([("data.id", pymongo.ASCENDING)])
+        await self.bot.db.premium.intervals.create_index([("guild", pymongo.ASCENDING), ("user", pymongo.ASCENDING)])
+        await self.bot.db.premium.intervals.create_index([("next", pymongo.ASCENDING)])
+        await self.bot.db.id_translators.create_index(
+            [("source_id", pymongo.ASCENDING), ("target_id", pymongo.ASCENDING)],
+            unique=True
+        )
 
     @Module.command()
     async def backup(self, ctx):
