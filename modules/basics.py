@@ -112,9 +112,14 @@ class BasicsModule(Module):
         Invite Xenon to your server
         """
         await ctx.respond(
-            f"Click [here](<https://xenon.bot/invite>) to **invite Xenon** to your server.",
+            f"Click [here](<https://discord.com/api/oauth2/authorize?client_id=524652984425250847&permissions=8&"
+            f"scope=applications.commands%20bot>) to **invite Xenon** to your server.",
             components=[ActionRow(
-                Button(label="Invite Xenon", url="https://xenon.bot/invite"),
+                Button(
+                    label="Invite Xenon",
+                    url="https://discord.com/api/oauth2/authorize?client_id=524652984425250847&permissions=8&"
+                        "scope=applications.commands%20bot"
+                ),
             )],
             ephemeral=True
         )
