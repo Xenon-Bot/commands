@@ -319,7 +319,7 @@ class SyncModule(Module):
             await ctx.respond(**create_message(
                 f"Successfully **created a ban sync** from `{_source_id}` to `{_target_id}` "
                 f"with the id `{sync_id.upper()}`.\n"
-                f"You can copy all existing bans using `/clipboard copy` and `/clipboard paste !* bans`.",
+                f"You can copy all existing bans using `/clipboard copy` and `/clipboard paste options: !* bans`.",
                 f=Format.SUCCESS
             ), ephemeral=True)
             await self.bot.db.audit_logs.insert_one({
@@ -345,16 +345,31 @@ class SyncModule(Module):
             description="The sync direction"
         ),
         server_b="The id of the server that the second role belongs to",
-        role_b="The id of the second role"
+        role_b="The id of the second role",
+        include=dict(
+            choices=[
+                ("Only when the role is added", "a"),
+                ("Only when the role is removed", "r"),
+                ("When the role is added or removed", "ar"),
+                ("When the role is added or removed or the member leaves", "arl")
+            ],
+            description="Events that should be synced"
+        )
     ))
     @guild_only
     @checks.has_permissions_level()
     @checks.bot_has_permissions("manage_roles")
     @checks.cooldown(1, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
-    async def role(self, ctx, role_a: CommandOptionType.ROLE, direction, server_b, role_b):
+    async def role(self, ctx, role_a: CommandOptionType.ROLE, direction, server_b, role_b, include="arl"):
         """
         Sync role assignments for one role to another
         """
+        events = {
+            "add": "a" in include,
+            "remove": "r" in include,
+            "leave": "l" in include
+        }
+
         try:
             guild = await ctx.bot.http.get_guild(server_b)
         except (rest.HTTPNotFound, rest.HTTPForbidden):
@@ -400,38 +415,43 @@ class SyncModule(Module):
 
         async def _create_role_sync(_source_guild_id, _source_role, _target_guild_id, _target_role):
             sync_id = utils.unique_id()
-            try:
-                await ctx.bot.db.premium.syncs.insert_one({
-                    "_id": sync_id,
-                    "guilds": [ctx.guild_id, guild.id],
-                    "type": SyncType.ROLE,
-                    "target": _target_role.id,
-                    "target_guild": _target_guild_id,
-                    "source": _source_role.id,
-                    "source_guild": _source_guild_id,
-                    "uses": 0
-                })
-            except pymongo.errors.DuplicateKeyError:
-                await ctx.respond(**create_message(
-                    f"Sync from `{_source_role.name}` (`{_source_role.id}`) "
-                    f"to `{_target_role.name}` (`{_target_role.id}`) "
-                    f"**already exists**.",
-                    f=Format.ERROR
-                ), ephemeral=True)
 
-            else:
-                await ctx.respond(**create_message(
-                    f"Successfully **created sync** from `{_source_role.name}` (`{_source_role.id}`) to "
-                    f"`{_target_role.name}` (`{_target_role.id}`) with the id `{sync_id.upper()}`",
-                    f=Format.SUCCESS
-                ))
-                await self.bot.db.audit_logs.insert_one({
-                    "type": AuditLogType.ROLE_SYNC_CREATE,
-                    "timestamp": datetime.utcnow(),
-                    "guilds": [ctx.guild_id, guild.id],
-                    "user": ctx.author.id,
-                    "extra": {"source": _source_role.id, "target": _target_role.id, "id": sync_id}
-                })
+            doc = await ctx.bot.db.premium.syncs.find_one_and_update(
+                {"target": _target_role.id, "source": _source_role.id, "type": SyncType.ROLE},
+                {
+                    "$set": {
+                        "events": events,
+                    },
+                    "$setOnInsert": {
+                        "_id": sync_id,
+                        "guilds": [ctx.guild_id, guild.id],
+                        "type": SyncType.ROLE,
+                        "target": _target_role.id,
+                        "target_guild": _target_guild_id,
+                        "source": _source_role.id,
+                        "source_guild": _source_guild_id,
+                        "uses": 0
+                    }
+                },
+                upsert=True,
+                return_document=pymongo.ReturnDocument.AFTER,
+                projection=("_id",)
+            )
+
+            sync_id = doc["_id"]
+
+            await ctx.respond(**create_message(
+                f"Successfully **created sync** from `{_source_role.name}` (`{_source_role.id}`) to "
+                f"`{_target_role.name}` (`{_target_role.id}`) with the id `{sync_id.upper()}`",
+                f=Format.SUCCESS
+            ))
+            await self.bot.db.audit_logs.insert_one({
+                "type": AuditLogType.ROLE_SYNC_CREATE,
+                "timestamp": datetime.utcnow(),
+                "guilds": [ctx.guild_id, guild.id],
+                "user": ctx.author.id,
+                "extra": {"source": _source_role.id, "target": _target_role.id, "id": sync_id}
+            })
 
         if "from" in direction:
             await ctx.count_cooldown()
@@ -440,6 +460,3 @@ class SyncModule(Module):
         if "to" in direction:
             await ctx.count_cooldown()
             await _create_role_sync(ctx.guild_id, role_a, guild.id, role_b)
-
-
-
