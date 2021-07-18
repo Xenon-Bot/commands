@@ -351,7 +351,9 @@ class SyncModule(Module):
                 ("Only when the role is added", "a"),
                 ("Only when the role is removed", "r"),
                 ("When the role is added or removed", "ar"),
-                ("When the role is added or removed or the member leaves", "arl")
+                ("When the role is added or removed or the member joins", "arj"),
+                ("When the role is added or removed or the member leaves", "arl"),
+                ("All the above", "arjl")
             ],
             description="Events that should be synced"
         )
@@ -367,6 +369,7 @@ class SyncModule(Module):
         events = {
             "add": "a" in include,
             "remove": "r" in include,
+            "join": "j" in include,
             "leave": "l" in include
         }
 
