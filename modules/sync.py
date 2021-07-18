@@ -362,7 +362,7 @@ class SyncModule(Module):
     @checks.has_permissions_level()
     @checks.bot_has_permissions("manage_roles")
     @checks.cooldown(1, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
-    async def role(self, ctx, role_a: CommandOptionType.ROLE, direction, server_b, role_b, include="arl"):
+    async def role(self, ctx, role_a: CommandOptionType.ROLE, direction, server_b, role_b, include="arjl"):
         """
         Sync role assignments for one role to another
         """
