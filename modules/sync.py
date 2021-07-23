@@ -30,6 +30,7 @@ class SyncModule(Module):
         )
         await self.bot.db.premium.syncs.create_index([("guilds", pymongo.ASCENDING)])
         await self.bot.db.premium.syncs.create_index([("target_guild", pymongo.ASCENDING)])
+        await self.bot.db.premium.syncs.create_index([("webhook.id", pymongo.ASCENDING)])
 
     @Module.command()
     async def sync(self, ctx):
