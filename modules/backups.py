@@ -63,6 +63,17 @@ option_descriptions = dict(
     messages="Some messages will be loaded"
 )
 
+option_names = dict(
+    delete_roles="Delete Roles",
+    delete_channels="Delete Channels",
+    roles="Load Roles",
+    channels="Load Channels",
+    settings="Load Settings",
+    bans="Load Bans",
+    members="Load Members",
+    messages="Load Messages"
+)
+
 
 def option_list(options):
     result = []
@@ -196,7 +207,7 @@ def create_warning_message(options, redis_key, prefix="backup_"):
             ActionRow(
                 SelectMenu(*[
                     SelectMenuOption(
-                        label=option.replace("_", " ").title(),
+                        label=option_names.get(option, option.replace("_", " ").title()),
                         value=option,
                         description=option_descriptions.get(option, "").replace("*", ""),
                         default=option in options
