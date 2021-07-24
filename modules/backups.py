@@ -20,6 +20,7 @@ from .audit_logs import AuditLogType
 from . import encryption
 
 MAX_BACKUPS = 15
+ALLOWED_OPTIONS = ("delete_roles", "delete_channels", "roles", "channels", "settings")
 
 
 def channel_tree(channels):
@@ -184,6 +185,36 @@ def parse_options(default, allowed, option_string):
     return options
 
 
+def create_warning_message(options, redis_key, prefix="backup_"):
+    return dict(
+        **create_message(
+            "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
+            f"{option_list(options)}",
+            f=Format.WARNING
+        ),
+        components=[
+            ActionRow(
+                SelectMenu(*[
+                    SelectMenuOption(
+                        label=option.replace("_", " ").title(),
+                        value=option,
+                        description=option_descriptions.get(option, "").replace("*", ""),
+                        default=option in options
+                    )
+                    for option in ALLOWED_OPTIONS
+                ],
+                           max_values=len(ALLOWED_OPTIONS), placeholder="Select Loading Options",
+                           custom_id=f"{prefix}load_options", args=[redis_key]),
+            ),
+            ActionRow(
+                Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id=f"{prefix}load_confirm",
+                       args=[redis_key]),
+                Button(label="Cancel", style=ButtonStyle.DANGER, custom_id=f"{prefix}load_cancel", args=[redis_key])
+            )
+        ]
+    )
+
+
 class BackupsModule(Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -296,7 +327,7 @@ class BackupsModule(Module):
 
         parsed_options = parse_options(
             ("delete_roles", "delete_channels", "roles", "channels", "settings"),
-            ("delete_roles", "delete_channels", "roles", "channels", "update", "settings"),
+            ALLOWED_OPTIONS,
             options
         )
 
@@ -305,20 +336,26 @@ class BackupsModule(Module):
             "backup_id": backup_id,
             "options": list(parsed_options)
         }))
+        await ctx.respond(**create_warning_message(parsed_options, redis_key), ephemeral=True)
 
-        # Require a confirmation by the user
-        await ctx.respond(**create_message(
-            "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
-            f"{option_list(parsed_options)}\n\n"
-            f"*If you don't see the buttons below this message please update your discord app.*",
-            f=Format.WARNING
-        ), components=[ActionRow(
-            Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id="backup_load_confirm", args=[redis_key]),
-            Button(label="Cancel", style=ButtonStyle.DANGER, custom_id="backup_load_cancel")
-        )], ephemeral=True)
+    @Module.component(name="backup_load_options")
+    async def load_options(self, ctx, redis_key):
+        scope = await ctx.bot.redis.get(redis_key)
+        if scope is None:
+            await ctx.update(**create_message(
+                "You were too slow, try again with `/backup load`",
+                f=Format.ERROR
+            ))
+            return
+
+        scope = json.loads(scope)
+        scope["options"] = [o for o in ctx.values if o in ALLOWED_OPTIONS]
+        await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps(scope))
+        await ctx.update(**create_warning_message(scope["options"], redis_key))
 
     @Module.component(name="backup_load_cancel")
-    async def load_cancel(self, ctx):
+    async def load_cancel(self, ctx, redis_key):
+        await ctx.bot.redis.delete(redis_key)
         await ctx.update(**create_message(
             "The loading process has been **cancelled**.\n\n"
             "Use `/backup load` to try again.",
