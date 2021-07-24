@@ -49,8 +49,8 @@ INTERVAL_KEEP = {
     PremiumLevel.THREE: 8
 }
 
-ALLOWED_OPTIONS = ("delete_roles", "delete_channels", "roles", "channels", "update", "settings", "members", "bans",
-                   "messages", "pins"),
+ALLOWED_OPTIONS = ("delete_roles", "delete_channels", "roles", "channels", "settings", "members", "bans",
+                   "messages", "pins")
 
 
 def channel_tree(channels):
