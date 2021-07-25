@@ -106,7 +106,7 @@ class TemplatesModule(Module):
     @checks.bot_has_permissions("administrator")
     @checks.not_in_maintenance
     @checks.cooldown(1, 5 * 60, bucket=checks.CooldownType.GUILD, manual=True)
-    async def load(self, ctx, name_or_id, options: str.lower = ""):
+    async def load(self, ctx, name_or_id: str.strip, options: str.lower = ""):
         """
         Load one of the public templates
 
@@ -383,7 +383,7 @@ class TemplatesModule(Module):
         name_or_id="The name, id or url of the template that you want to load"
     ))
     @checks.cooldown(2, 10, bucket=checks.CooldownType.AUTHOR)
-    async def info(self, ctx, name_or_id):
+    async def info(self, ctx, name_or_id: str.strip):
         """
         Get information about a public template
         """
