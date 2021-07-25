@@ -364,7 +364,7 @@ class BackupsModule(Module):
     @checks.bot_has_permissions("administrator")
     @checks.not_in_maintenance
     @checks.cooldown(1, 5 * 60, bucket=checks.CooldownType.GUILD, manual=True)
-    async def load(self, ctx, backup_id, message_count: int = 250, options: str.lower = ""):
+    async def load(self, ctx, backup_id: str.strip, message_count: int = 250, options: str.lower = ""):
         """
         Load a previously created backup on this server
 
@@ -637,7 +637,7 @@ class BackupsModule(Module):
         )
     )
     @checks.cooldown(5, 30, bucket=checks.CooldownType.AUTHOR)
-    async def info(self, ctx, backup_id):
+    async def info(self, ctx, backup_id: str.strip):
         """
         Get information about a previously created backup
         """
@@ -815,7 +815,7 @@ class BackupsModule(Module):
         )
     )
     @checks.cooldown(5, 30, bucket=checks.CooldownType.AUTHOR)
-    async def delete(self, ctx, backup_id):
+    async def delete(self, ctx, backup_id: str.strip):
         """
         Delete a previously created backup >THIS CAN NOT BE UNDONE<
 
