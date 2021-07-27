@@ -78,6 +78,11 @@ class Xenon(InteractionBot):
             except rest.HTTPException:
                 pass
 
+    async def execute_component(self, component, payload, args):
+        raw_premium_level = await self.redis.hget("premium:users", payload.author.id) or "0"
+        payload.premium_level = PremiumLevel(int(raw_premium_level))
+        return await super().execute_component(component, payload, args)
+
     async def execute_command(self, command, payload, remaining_options):
         await self.redis.hincrby("cmd:commands", command.full_name, 1)
 

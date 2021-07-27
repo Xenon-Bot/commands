@@ -15,6 +15,7 @@ import base64
 import hashlib
 import binascii
 import json
+from copy import deepcopy
 
 from .audit_logs import AuditLogType
 from . import chatlog
@@ -277,6 +278,45 @@ class BackupsModule(Module):
             unique=True
         )
 
+    async def _unknown_backup_message(self, user_id, backup_id):
+        data = deepcopy(create_message(
+            f"You have **no backup** with the id `{backup_id}`.\n\n"
+            f"*Keep in mind that you can only access your own backups.*",
+            f=Format.ERROR
+        ))
+
+        select_options = []
+        backups = self.bot.db.backups.find(
+            {"creator": user_id},
+            sort=[("timestamp", pymongo.DESCENDING)],
+            projection=("_id", "data.name", "timestamp", "encrypted"),
+            limit=25
+        )
+        async for backup in backups:
+            if backup.get("encrypted"):
+                continue
+
+            _backup_id = backup["_id"].upper()
+            select_options.append(SelectMenuOption(
+                label=_backup_id,
+                description=f"{backup['data']['name']} ({datetime_to_string(backup['timestamp'])} UTC)"[:50],
+                value=_backup_id
+            ))
+
+        if len(select_options) != 0:
+            data.setdefault("components", []).insert(0, ActionRow(
+                SelectMenu(
+                    *select_options,
+                    placeholder="Select a backup",
+                    custom_id="backup_info_direct",
+                    min_values=1,
+                    max_values=1
+                ),
+            ))
+
+        data["ephemeral"] = True
+        return data
+
     @Module.command()
     async def backup(self, ctx):
         """
@@ -354,6 +394,33 @@ class BackupsModule(Module):
             "extra": {}
         })
 
+    async def _backup_load(self, ctx, backup_id, options, message_count, edit=False):
+        exists = await self._backup_exists(ctx.author.id, backup_id)
+        if not exists:
+            data = await self._unknown_backup_message(ctx.author.id, backup_id)
+            await ctx.respond(**data)
+            return
+
+        max_message_count = MAX_MESSAGE_COUNT[ctx.premium_level]
+        message_count = max(0, min(message_count, max_message_count))
+
+        parsed_options = parse_options(
+            ("delete_roles", "delete_channels", "roles", "channels", "settings", "members", "bans", "messages"),
+            ALLOWED_OPTIONS,
+            options
+        )
+
+        redis_key = f"backup_load:{unique_id()}"
+        await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps({
+            "backup_id": backup_id,
+            "message_count": message_count,
+            "options": list(parsed_options)
+        }))
+        if edit:
+            await ctx.edit_response(**create_warning_message(parsed_options, redis_key))
+        else:
+            await ctx.respond(**create_warning_message(parsed_options, redis_key), ephemeral=True)
+
     @backup.sub_command(extends=dict(
         backup_id="The id of the previously created backup",
         message_count="The count of messages to load per channel (default max)",
@@ -370,31 +437,11 @@ class BackupsModule(Module):
 
         Get more help on the [wiki](https://wiki.xenon.bot/backups#loading-a-backup).
         """
-        max_message_count = MAX_MESSAGE_COUNT[ctx.premium_level]
-        message_count = max(0, min(message_count, max_message_count))
+        return await self._backup_load(ctx, backup_id, options, message_count)
 
-        exists = await self._backup_exists(ctx.author.id, backup_id)
-        if not exists:
-            await ctx.respond(**create_message(
-                f"You have **no backup** with the id `{backup_id}`.\n\n"
-                f"*Keep in mind that you can only access your own backups.*",
-                f=Format.ERROR
-            ), ephemeral=True)
-            return
-
-        parsed_options = parse_options(
-            ("delete_roles", "delete_channels", "roles", "channels", "settings", "members", "bans", "messages"),
-            ALLOWED_OPTIONS,
-            options
-        )
-
-        redis_key = f"backup_load:{unique_id()}"
-        await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps({
-            "backup_id": backup_id,
-            "message_count": message_count,
-            "options": list(parsed_options)
-        }))
-        await ctx.respond(**create_warning_message(parsed_options, redis_key), ephemeral=True)
+    @Module.component(name="backup_load_direct")
+    async def load_direct(self, ctx, backup_id):
+        return await self._backup_load(ctx, backup_id, "", 250, edit=True)
 
     @Module.component(name="backup_load_options")
     async def load_options(self, ctx, redis_key):
@@ -631,24 +678,10 @@ class BackupsModule(Module):
             f=Format.INFO
         ), ephemeral=True)
 
-    @backup.sub_command(
-        extends=dict(
-            backup_id="The id of the previously created backup"
-        )
-    )
-    @checks.cooldown(5, 30, bucket=checks.CooldownType.AUTHOR)
-    async def info(self, ctx, backup_id: str.strip):
-        """
-        Get information about a previously created backup
-        """
-        props, data = await self._retrieve_backup(ctx.author.id, backup_id)
+    async def _backup_info_message(self, user_id, backup_id, direct_load=True):
+        props, data = await self._retrieve_backup(user_id, backup_id)
         if data is None:
-            await ctx.respond(**create_message(
-                f"You have **no backup** with the id `{backup_id}`.\n\n"
-                f"*Keep in mind that you can only access your own backups.*",
-                f=Format.ERROR
-            ), ephemeral=True)
-            return
+            return None
 
         channel_list = channel_tree(data.channels)
         if len(channel_list) > 1024:
@@ -677,43 +710,89 @@ class BackupsModule(Module):
         except ZeroDivisionError:
             average_messages = 0
 
-        await ctx.respond(embeds=[{
-            "title": f"Backup Info - *{data.name}*",
-            "color": Format.INFO.color,
-            "footer": {"text": "  ".join(properties)},
-            "fields": [
-                {
-                    "name": "Created At",
-                    "value": datetime_to_string(props["timestamp"]),
-                    "inline": False
-                },
-                {
-                    "name": "Members",
-                    "value": f"`{len(data.members)}`",
-                    "inline": True
-                },
-                {
-                    "name": "Bans",
-                    "value": f"`{len(data.bans)}`",
-                    "inline": True
-                },
-                {
-                    "name": "Messages",
-                    "value": f"`{total_messages}` total (~`{average_messages}` per channel)",
-                    "inline": False
-                },
-                {
-                    "name": "Channels",
-                    "value": channel_list,
-                    "inline": True
-                },
-                {
-                    "name": "Roles",
-                    "value": role_list,
-                    "inline": True
-                },
-            ]
-        }], ephemeral=True)
+        buttons = [
+            Button(
+                style=ButtonStyle.DANGER,
+                label="Delete this backup",
+                custom_id="backup_delete_direct",
+                args=[backup_id]
+            )
+        ]
+        if direct_load:
+            buttons.insert(0, Button(
+                style=ButtonStyle.PRIMARY,
+                label="Load this backup",
+                custom_id="backup_load_direct",
+                args=[backup_id]
+            ))
+
+        return dict(
+            embeds=[{
+                "title": f"Backup Info - *{data.name}*",
+                "color": Format.INFO.color,
+                "footer": {"text": "  ".join(properties)},
+                "fields": [
+                    {
+                        "name": "Created At",
+                        "value": datetime_to_string(props["timestamp"]),
+                        "inline": False
+                    },
+                    {
+                        "name": "Members",
+                        "value": f"`{len(data.members)}`",
+                        "inline": True
+                    },
+                    {
+                        "name": "Bans",
+                        "value": f"`{len(data.bans)}`",
+                        "inline": True
+                    },
+                    {
+                        "name": "Messages",
+                        "value": f"`{total_messages}` total (~`{average_messages}` per channel)",
+                        "inline": False
+                    },
+                    {
+                        "name": "Channels",
+                        "value": channel_list,
+                        "inline": True
+                    },
+                    {
+                        "name": "Roles",
+                        "value": role_list,
+                        "inline": True
+                    },
+                ]
+            }],
+            components=[ActionRow(*buttons)],
+            ephemeral=True
+        )
+
+    async def _backup_info(self, ctx, backup_id):
+        data = await self._backup_info_message(ctx.author.id, backup_id, direct_load=ctx.guild_id is not None)
+        if data is None:
+            data = await self._unknown_backup_message(ctx.author.id, backup_id)
+            await ctx.respond(**data)
+            return
+
+        await ctx.respond(**data)
+
+    @backup.sub_command(
+        extends=dict(
+            backup_id="The id of the previously created backup"
+        )
+    )
+    @checks.cooldown(5, 30, bucket=checks.CooldownType.AUTHOR)
+    async def info(self, ctx, backup_id: str.strip):
+        """
+        Get information about a previously created backup
+        """
+        return await self._backup_info(ctx, backup_id)
+
+    @Module.component(name="backup_info_direct")
+    async def info_direct(self, ctx):
+        backup_id = ctx.values[0]
+        return await self._backup_info(ctx, backup_id)
 
     async def _backup_list_message(self, user_id, page, master_key=None):
         _filter = {"creator": user_id}
@@ -735,6 +814,7 @@ class BackupsModule(Module):
                 master_key = None
 
         fields = []
+        select_options = []
         contains_encrypted = False
         async for backup in self.bot.db.backups.find(
                 _filter,
@@ -769,6 +849,12 @@ class BackupsModule(Module):
                 value=f"{backup['data']['name']} (`{datetime_to_string(backup['timestamp'])} UTC`)"
             ))
 
+            select_options.append(SelectMenuOption(
+                label=backup_id,
+                description=f"{backup['data']['name']} ({datetime_to_string(backup['timestamp'])} UTC)"[:50],
+                value=backup_id
+            ))
+
         description = f"Displaying **{(page - 1) * 10 + 1}** - **{min(page * 10, total_count)}** " \
                       f"of **{total_count}** total backups"
         if contains_encrypted:
@@ -783,12 +869,23 @@ class BackupsModule(Module):
                 color=Format.INFO.color,
                 description=f"{description}\n​",
             )],
-            components=[ActionRow(
-                Button(label="Previous Page", custom_id=f"backup_list", args=[str(page - 1)],
-                       disabled=page <= 1 or master_key),
-                Button(label="Next Page", custom_id=f"backup_list", args=[str(page + 1)],
-                       disabled=total_count <= page * 10 or master_key)
-            )],
+            components=[
+                ActionRow(
+                    SelectMenu(
+                        *select_options,
+                        max_values=1,
+                        min_values=1,
+                        custom_id="backup_info_direct",
+                        placeholder="Select a backup"
+                    )
+                ),
+                ActionRow(
+                    Button(label="Previous Page", custom_id=f"backup_list", args=[str(page - 1)],
+                           disabled=page <= 1 or master_key),
+                    Button(label="Next Page", custom_id=f"backup_list", args=[str(page + 1)],
+                           disabled=total_count <= page * 10 or master_key)
+                )
+            ],
             ephemeral=True
         )
 
@@ -837,10 +934,24 @@ class BackupsModule(Module):
             ), ephemeral=True)
 
         else:
-            await ctx.respond(**create_message(
-                f"You have **no backup** with the id `{backup_id}`.",
-                f=Format.ERROR
-            ), ephemeral=True)
+            data = await self._unknown_backup_message(ctx.author.id, backup_id)
+            await ctx.respond(**data)
+
+    @Module.component(name="backup_delete_direct")
+    async def delete_direct(self, ctx, backup_id):
+        if len(backup_id) > 20:
+            try:
+                key_bytes = encryption.id_to_key(backup_id)
+            except binascii.Error:
+                pass
+            else:
+                backup_id = base64.b64encode(hashlib.sha3_512(key_bytes).digest()).decode()
+
+        await self._delete_backup(ctx.author.id, backup_id)
+        await ctx.edit_response(**create_message(
+            "Successfully **deleted backup**.",
+            f=Format.SUCCESS
+        ), ephemeral=True)
 
     @backup.sub_command(
         extends=dict(
