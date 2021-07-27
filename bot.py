@@ -1,7 +1,6 @@
 from dbots import *
 from dbots.cmd import *
 from motor.motor_asyncio import AsyncIOMotorClient
-import aioredis
 import json
 from os import environ as env
 import asyncio
@@ -10,7 +9,6 @@ import sys
 from datetime import datetime
 import grpclib.client
 from dbots.protos import backups_grpc
-import weakref
 import sentry_sdk
 
 
