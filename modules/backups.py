@@ -392,9 +392,12 @@ class BackupsModule(Module):
         """
         return await self._backup_load(ctx, backup_id, options)
 
-    # @Module.component(name="backup_load_direct")
-    # async def load_direct(self, ctx, backup_id):
-    #     return await self._backup_load(ctx, backup_id, "", edit=True)
+    @Module.component(name="backup_load_direct")
+    @checks.has_permissions_level(destructive=True)
+    @checks.bot_has_permissions("administrator")
+    @checks.not_in_maintenance
+    async def load_direct(self, ctx, backup_id):
+        return await self._backup_load(ctx, backup_id, "", edit=True)
 
     @Module.component(name="backup_load_options")
     async def load_options(self, ctx, redis_key):
@@ -664,7 +667,7 @@ class BackupsModule(Module):
                 args=[backup_id]
             )
         ]
-        if False:  # direct_load:
+        if direct_load:
             buttons.insert(0, Button(
                 style=ButtonStyle.PRIMARY,
                 label="Load this backup",
