@@ -103,7 +103,18 @@ class ChatlogModule(Module):
             ), ephemeral=True)
             return
 
-        # await ctx.count_cooldown()
+        if before is not None and not before.isdigit():
+            props, data = await self._retrieve_chatlog(ctx.author.id, before)
+            if data is None:
+                await ctx.respond(**create_message(
+                    f"The `before` argument must be a message id or a valid chatlog id.",
+                    f=Format.ERROR
+                ), ephemeral=True)
+                return
+
+            before = data.messages[-1].id
+
+        await ctx.count_cooldown()
         await ctx.respond(**create_message(
             "Creating chatlog ...",
             f=Format.PLEASE_WAIT
