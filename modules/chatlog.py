@@ -76,7 +76,7 @@ class ChatlogModule(Module):
 
     @chatlog.sub_command(extends=dict(
         message_count="The count of messages to save",
-        before="The id of the message"
+        before="The id of a message or chatlog"
     ))
     @checks.guild_only
     @checks.has_permissions_level()
