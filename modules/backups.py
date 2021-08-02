@@ -852,6 +852,33 @@ class BackupsModule(Module):
 
         Get more help on the [wiki](https://wiki.xenon.bot/backups#deleting-a-backup).
         """
+        await ctx.respond(
+            **create_message("Are you sure that you want to delete this backup? **This can not be undone**.",
+                             f=Format.WARNING),
+            components=[ActionRow(
+                Button(label="Confirm", custom_id=f"backup_delete_direct_confirm", args=[backup_id],
+                       style=ButtonStyle.SUCCESS),
+                Button(label="Cancel", custom_id=f"backup_delete_direct_cancel",
+                       style=ButtonStyle.DANGER),
+            )],
+            ephemeral=True
+        )
+
+    @Module.component(name="backup_delete_direct")
+    async def delete_direct(self, ctx, backup_id):
+        await ctx.update(
+            **create_message("Are you sure that you want to delete this backup? **This can not be undone**.", f=Format.WARNING),
+            components=[ActionRow(
+                Button(label="Confirm", custom_id=f"backup_delete_direct_confirm", args=[backup_id],
+                       style=ButtonStyle.SUCCESS),
+                Button(label="Cancel", custom_id=f"backup_delete_direct_cancel",
+                       style=ButtonStyle.DANGER),
+            )],
+            ephemeral=True
+        )
+
+    @Module.component(name="backup_delete_direct_confirm")
+    async def delete_direct_confirm(self, ctx, backup_id):
         if len(backup_id) > 20:
             try:
                 key_bytes = encryption.id_to_key(backup_id)
@@ -862,29 +889,21 @@ class BackupsModule(Module):
 
         result = await self._delete_backup(ctx.author.id, backup_id)
         if result:
-            await ctx.respond(**create_message(
+            await ctx.update(**create_message(
                 "Successfully **deleted backup**.",
                 f=Format.SUCCESS
             ), ephemeral=True)
 
         else:
             data = await self._unknown_backup_message(ctx.author.id, backup_id)
-            await ctx.respond(**data)
+            await ctx.update(**data)
 
-    @Module.component(name="backup_delete_direct")
-    async def delete_direct(self, ctx, backup_id):
-        if len(backup_id) > 20:
-            try:
-                key_bytes = encryption.id_to_key(backup_id)
-            except binascii.Error:
-                pass
-            else:
-                backup_id = base64.b64encode(hashlib.sha3_512(key_bytes).digest()).decode()
-
-        await self._delete_backup(ctx.author.id, backup_id)
-        await ctx.edit_response(**create_message(
-            "Successfully **deleted backup**.",
-            f=Format.SUCCESS
+    @Module.component(name="backup_delete_direct_cancel")
+    async def delete_direct_cancel(self, ctx):
+        await ctx.update(**create_message(
+            "The backup has not been deleted.\n\n"
+            "Use `/backup delete` to try again.",
+            f=Format.INFO
         ), ephemeral=True)
 
     @backup.sub_command(
