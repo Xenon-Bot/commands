@@ -1,7 +1,6 @@
 from dbots import *
 from dbots.cmd import *
 from motor.motor_asyncio import AsyncIOMotorClient
-import aioredis
 import json
 from os import environ as env
 import asyncio
@@ -47,7 +46,9 @@ class Xenon(InteractionBot):
         else:
             if not isinstance(e, rest.HTTPException):
                 with sentry_sdk.push_scope() as scope:
-                    scope.set_tag("command", ctx.command.full_name)
+                    if isinstance(ctx, CommandContext):
+                        scope.set_tag("command", ctx.command.full_name)
+
                     scope.set_tag("guild_id", ctx.guild_id)
                     scope.set_tag("args", ", ".join([f"{arg.name}: {arg.value}" for arg in ctx.args]))
                     scope.set_user({
