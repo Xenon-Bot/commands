@@ -159,7 +159,6 @@ class AuditLogModule(Module):
 
     @Module.component(name="audit_logs")
     async def logs_page(self, ctx, page, filter_value):
-        print(filter_value, _deserialize_type_filter(filter_value))
         data = await self._audit_logs_message(ctx.guild_id, int(page), _deserialize_type_filter(filter_value))
         await ctx.update(**data)
 
