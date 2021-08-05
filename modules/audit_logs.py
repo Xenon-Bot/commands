@@ -26,7 +26,7 @@ text_formats = {
     AuditLogType.BACKUP_INTERVAL_ENABLE: "<@{user}> enabled their backup interval for this server",
     AuditLogType.BACKUP_INTERVAL_DISABLE: "<@{user}> disabled their backup interval for this server",
     AuditLogType.TEMPLATE_LOAD: "<@{user}> loaded a template on this server",
-    AuditLogType.COPY: "<@{user}> copied the server with the id `{source}` to the server with the id `{target}`",
+    AuditLogType.COPY: "<@{user}> copied this server or pasted a copy on this server",
     AuditLogType.CHATLOG_CREATE: "<@{user}> created a chatlog of the channel <#{channel}>",
     AuditLogType.CHATLOG_LOAD: "<@{user}> loaded a chatlog in the channel <#{channel}>",
     AuditLogType.MESSAGE_SYNC_CREATE: "<@{user}> created a message sync from <#{source}> to "
@@ -37,6 +37,23 @@ text_formats = {
     AuditLogType.ROLE_SYNC_CREATE: "<@{user}> created a role sync from the role with the id {source} to "
                                    "the role with the id {target} with the id `{id}`",
 }
+
+
+def _serialize_type_filter(types):
+    value = 0
+    for t in types:
+        value |= 1 << int(t)
+
+    return str(value)
+
+
+def _deserialize_type_filter(value):
+    value = int(value)
+    return [
+        t
+        for t in AuditLogType
+        if value & (1 << int(t)) == 1 << int(t)
+    ]
 
 
 class AuditLogModule(Module):
@@ -59,25 +76,22 @@ class AuditLogModule(Module):
         Get a list of actions that were recently taken on this server
         """
 
-    @audit.sub_command(extends=dict(
-        page="The page to display (default 1)"
-    ))
-    @checks.guild_only
-    @checks.has_permissions_level()
-    @checks.cooldown(2, 10, bucket=checks.CooldownType.GUILD)
-    async def logs(self, ctx, page: int = 1):
-        """
-        Get a list of actions that were recently taken on this server
-        """
+    async def _audit_logs_message(self, guild_id, page, visible_types=None):
+        if visible_types is None:
+            visible_types = [t for t in AuditLogType]
+
         page = max(page, 1)
-        _filter = {"guilds": ctx.guild_id}
+        _filter = {
+            "guilds": guild_id,
+            "type": {"$in": [int(t) for t in visible_types]}
+        }
         total_count = await self.bot.db.audit_logs.count_documents(_filter)
+
         if total_count == 0:
-            await ctx.respond(**create_message(
+            return dict(**create_message(
                 "There **aren't any audit logs** for this server yet.",
-                f=Format.INFO
-            ))
-            return
+                f=Format.INFO,
+            ), ephemeral=True)
 
         fields = []
         async for entry in self.bot.db.audit_logs.find(
@@ -95,12 +109,62 @@ class AuditLogModule(Module):
 
         description = f"Displaying **{(page - 1) * 10 + 1}** - **{min(page * 10, total_count)}** " \
                       f"of **{total_count}** total entries"
-        if total_count > page * 10:
-            description += f"\n\nType `/audit logs page: {page + 1}` for the next page"
 
-        await ctx.respond(embeds=[dict(
-            title="Audit Logs",
-            fields=fields,
-            color=Format.INFO.color,
-            description=f"{description}\n​"
-        )], ephemeral=True)
+        return dict(
+            embeds=[dict(
+                title="Audit Logs",
+                fields=fields,
+                color=Format.INFO.color,
+                description=f"{description}\n​"
+            )],
+            components=[
+                ActionRow(
+                    SelectMenu(
+                        *[
+                            SelectMenuOption(
+                                label=t.name.replace("_", " ").title(),
+                                value=t.value,
+                                default=t in visible_types
+                            )
+                            for t in AuditLogType
+                        ],
+                        min_values=1,
+                        max_values=len(AuditLogType),
+                        custom_id="audit_logs_filter"
+                    )
+                ),
+                ActionRow(
+                    Button(label="Previous Page", custom_id=f"audit_logs",
+                           args=[str(page - 1), _serialize_type_filter(visible_types)], disabled=page <= 1),
+                    Button(label="Next Page", custom_id=f"audit_logs",
+                           args=[str(page + 1), _serialize_type_filter(visible_types)],
+                           disabled=total_count <= page * 10)
+                )
+            ],
+            ephemeral=True
+        )
+
+    @audit.sub_command(extends=dict(
+        page="The page to display (default 1)"
+    ))
+    @checks.guild_only
+    @checks.has_permissions_level()
+    @checks.cooldown(2, 10, bucket=checks.CooldownType.GUILD)
+    async def logs(self, ctx, page: int = 1):
+        """
+        Get a list of actions that were recently taken on this server
+        """
+        data = await self._audit_logs_message(ctx.guild_id, page)
+        await ctx.respond(**data)
+
+    @Module.component(name="audit_logs")
+    async def logs_page(self, ctx, page, filter_value):
+        print(filter_value, _deserialize_type_filter(filter_value))
+        data = await self._audit_logs_message(ctx.guild_id, int(page), _deserialize_type_filter(filter_value))
+        await ctx.update(**data)
+
+    @Module.component(name="audit_logs_filter")
+    async def logs_filter(self, ctx):
+        visible_types = [AuditLogType(int(t)) for t in ctx.values]
+        data = await self._audit_logs_message(ctx.guild_id, 1, visible_types)
+        await ctx.update(**data)

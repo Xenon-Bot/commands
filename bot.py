@@ -48,9 +48,9 @@ class Xenon(InteractionBot):
                 with sentry_sdk.push_scope() as scope:
                     if isinstance(ctx, CommandContext):
                         scope.set_tag("command", ctx.command.full_name)
+                        scope.set_tag("args", ", ".join([f"{arg.name}: {arg.value}" for arg in ctx.args]))
 
                     scope.set_tag("guild_id", ctx.guild_id)
-                    scope.set_tag("args", ", ".join([f"{arg.name}: {arg.value}" for arg in ctx.args]))
                     scope.set_user({
                         "id": ctx.author.id,
                         "name": ctx.author.name,
