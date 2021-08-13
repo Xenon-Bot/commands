@@ -110,7 +110,7 @@ class Xenon(InteractionBot):
         payload.premium_level = PremiumLevel(int(raw_premium_level))
 
         allowed_commands = {
-            "settings show", "settings permissions", "settings reset", "leave", "ping", "support", "audit logs"
+            "settings show", "settings permissions", "settings reset", "leave", "ping", "support", "audit logs", "help"
         }
         if payload.premium_level == PremiumLevel.NONE and command.full_name not in allowed_commands:
             return InteractionResponse.message(
