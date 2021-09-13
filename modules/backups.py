@@ -1176,7 +1176,13 @@ class BackupsModule(Module):
         except OverflowError:
             interval_td = timedelta(hours=24)
 
-        hours = max(interval_td.total_seconds() // 3600, MIN_INTERVAL[ctx.premium_level])
+        hours = interval_td.total_seconds() // 3600
+        if hours < MIN_INTERVAL[ctx.premium_level]:
+            await ctx.respond(**create_message(
+                f"The **minimum interval** for your tier is `{MIN_INTERVAL[ctx.premium_level]} hours`.",
+                f=Format.ERROR
+            ), ephemeral=True)
+
         interval_td = timedelta(hours=hours)
 
         now = datetime.utcnow()
