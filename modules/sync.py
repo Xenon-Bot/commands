@@ -264,13 +264,14 @@ class SyncModule(Module):
             choices=SYNC_DIRECTIONS,
             description="The sync direction"
         ),
-        server_id="The id of the second sever"
+        server_id="The id of the second sever",
+        sync_existing="Whether to sync all existing bans and recover from outages"
     ))
     @guild_only
     @checks.has_permissions_level()
     @checks.bot_has_permissions("ban_members")
     @checks.cooldown(1, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
-    async def bans(self, ctx, direction, server_id):
+    async def bans(self, ctx, direction, server_id, sync_existing=True):
         """
         Sync new bans and unbans from one server to another
         """
@@ -308,6 +309,8 @@ class SyncModule(Module):
                     "type": SyncType.BANS,
                     "target": _target_id,
                     "source": _source_id,
+                    "lazy": sync_existing,
+                    "last_lazy": datetime.min,
                     "uses": 0
                 })
             except pymongo.errors.DuplicateKeyError:
@@ -357,13 +360,15 @@ class SyncModule(Module):
                 ("All the above", "arjl")
             ],
             description="Events that should be synced"
-        )
+        ),
+        sync_existing="Whether to sync all existing assignments and recover from outages"
     ))
     @guild_only
     @checks.has_permissions_level()
     @checks.bot_has_permissions("manage_roles")
     @checks.cooldown(1, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
-    async def role(self, ctx, role_a: CommandOptionType.ROLE, direction, server_b, role_b, include="arjl"):
+    async def role(self, ctx, role_a: CommandOptionType.ROLE, direction, server_b, role_b, include="arjl",
+                   sync_existing=True):
         """
         Sync role assignments for one role to another
         """
@@ -425,6 +430,8 @@ class SyncModule(Module):
                 {
                     "$set": {
                         "events": events,
+                        "lazy": sync_existing,
+                        "last_lazy": datetime.min
                     },
                     "$setOnInsert": {
                         "_id": sync_id,
