@@ -2,8 +2,8 @@ from dbots.cmd import *
 
 PREMIUM_ONLY_TEXT = "This command can **only** be used with **Xenon Premium**.\n\n" \
                     "**Xenon Premium** is the **paid version** of Xenon.\n" \
-                    "You can buy it on [patreon](https://www.patreon.com/merlinfuchs) " \
-                    "and find a detailed list of perks [here](https://wiki.xenon.bot/premium)\n​"
+                    "You can buy it on [patreon](<https://www.patreon.com/merlinfuchs>) " \
+                    "and find a detailed list of perks [here](<https://wiki.xenon.bot/premium>)\n​"
 PREMIUM_COMPONENTS = [ActionRow(
     Button(label="Premium Perks", url="https://wiki.xenon.bot/en/premium", emoji="⭐"),
     Button(label="Buy Premium", url="https://xenon.bot/patreon", emoji="🛒")

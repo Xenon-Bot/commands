@@ -19,9 +19,11 @@ from copy import deepcopy
 
 from .audit_logs import AuditLogType
 from . import encryption
+from . import premium
 
 MAX_BACKUPS = 15
 ALLOWED_OPTIONS = ("delete_roles", "delete_channels", "roles", "channels", "settings")
+ADVERTISE_OPTIONS = ("bans", "members", "messages")
 
 
 def channel_tree(channels):
@@ -206,17 +208,30 @@ def create_warning_message(options, redis_key, prefix="backup_"):
         ),
         components=[
             ActionRow(
-                SelectMenu(*[
-                    SelectMenuOption(
-                        label=option_names.get(option, option.replace("_", " ").title()),
-                        value=option,
-                        description=option_descriptions.get(option, "").replace("*", ""),
-                        default=option in options
-                    )
-                    for option in ALLOWED_OPTIONS
-                ],
-                           max_values=len(ALLOWED_OPTIONS), placeholder="Select Loading Options",
-                           custom_id=f"{prefix}load_options", args=[redis_key]),
+                SelectMenu(
+                    *[
+                        SelectMenuOption(
+                            label=option_names.get(option, option.replace("_", " ").title()),
+                            value=option,
+                            description=option_descriptions.get(option, "").replace("*", ""),
+                            default=option in options
+                        )
+                        for option in ALLOWED_OPTIONS
+                    ],
+                    *[
+                        SelectMenuOption(
+                            label=option_names.get(option, option.replace("_", " ").title()),
+                            value=option,
+                            description=option_descriptions.get(option, "").replace("*", ""),
+                            default=option in options,
+                            emoji="⭐"
+                        )
+                        for option in ADVERTISE_OPTIONS
+                    ],
+                    max_values=len(ALLOWED_OPTIONS) + len(ADVERTISE_OPTIONS),
+                    placeholder="Select Loading Options",
+                    custom_id=f"{prefix}load_options",
+                    args=[redis_key]),
             ),
             ActionRow(
                 Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id=f"{prefix}load_confirm",
@@ -339,7 +354,8 @@ class BackupsModule(Module):
             f"Successfully **created backup** with the id `{backup_id}`.\n\n"
             f"**Usage**\n"
             f"```/backup info backup_id: {backup_id}```"
-            f"```/backup load backup_id: {backup_id}```",
+            f"```/backup load backup_id: {backup_id}```\n"
+            f"⭐ Use [Xenon Premium](https://wiki.xenon.bot/en/premium) to save messages, members, and bans!\n",
             f=Format.SUCCESS
         ))
 
@@ -410,7 +426,19 @@ class BackupsModule(Module):
             return
 
         scope = json.loads(scope)
-        scope["options"] = [o for o in ctx.values if o in ALLOWED_OPTIONS]
+        scope["options"] = []
+        for option in ctx.values:
+            if option in ALLOWED_OPTIONS:
+                scope["options"].append(option)
+            else:
+                await ctx.bot.redis.delete(redis_key)
+                await ctx.update(
+                    premium.PREMIUM_ONLY_TEXT.replace("command", "option"),
+                    components=premium.PREMIUM_COMPONENTS,
+                    embeds=[]
+                )
+                return
+
         await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps(scope))
         await ctx.update(**create_warning_message(scope["options"], redis_key))
 
@@ -675,10 +703,17 @@ class BackupsModule(Module):
                 args=[backup_id]
             ))
 
+        description = ""
+        # members should only be empty for non-premium backups
+        if len(data.members) == 0:
+            description += "This backup doesn't contain any messages, members, or bans! " \
+                           "[⭐ Learn More](https://wiki.xenon.bot/en/premium)\n​"
+
         return dict(
             embeds=[{
                 "title": f"Backup Info - *{data.name}*",
                 "color": Format.INFO.color,
+                "description": description,
                 "footer": {"text": "  ".join(properties)},
                 "fields": [
                     {
@@ -867,7 +902,8 @@ class BackupsModule(Module):
     @Module.component(name="backup_delete_direct")
     async def delete_direct(self, ctx, backup_id):
         await ctx.update(
-            **create_message("Are you sure that you want to delete this backup? **This can not be undone**.", f=Format.WARNING),
+            **create_message("Are you sure that you want to delete this backup? **This can not be undone**.",
+                             f=Format.WARNING),
             components=[ActionRow(
                 Button(label="Confirm", custom_id=f"backup_delete_direct_confirm", args=[backup_id],
                        style=ButtonStyle.SUCCESS),
@@ -1066,6 +1102,9 @@ class BackupsModule(Module):
             interval=dict(
                 description="The interval in which the backups are created (e.g. every 24 hours)",
                 choices=(
+                        ("⭐ 4 hours", "4h"),
+                        ("⭐ 8 hours", "8h"),
+                        ("⭐ 12 hours", "12h"),
                         ("24 hours", "24h"),
                         ("2 days", "2d"),
                         ("3 days", "3d"),
@@ -1090,7 +1129,15 @@ class BackupsModule(Module):
         except OverflowError:
             interval_td = timedelta(hours=24)
 
-        hours = max(interval_td.total_seconds() // 3600, 24)
+        hours = interval_td.total_seconds() // 3600
+        if hours < 24:
+            await ctx.respond(
+                premium.PREMIUM_ONLY_TEXT.replace("This command", "Intervals below `24 hours`"),
+                components=premium.PREMIUM_COMPONENTS,
+                ephemeral=True
+            )
+            return
+
         interval_td = timedelta(hours=hours)
 
         now = datetime.utcnow()
