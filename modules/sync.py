@@ -310,7 +310,7 @@ class SyncModule(Module):
                     "target": _target_id,
                     "source": _source_id,
                     "lazy": sync_existing,
-                    "last_lazy": datetime.min,
+                    "next_lazy": datetime.utcnow(),
                     "uses": 0
                 })
             except pymongo.errors.DuplicateKeyError:
@@ -431,7 +431,7 @@ class SyncModule(Module):
                     "$set": {
                         "events": events,
                         "lazy": sync_existing,
-                        "last_lazy": datetime.min
+                        "next_lazy": datetime.utcnow()
                     },
                     "$setOnInsert": {
                         "_id": sync_id,
