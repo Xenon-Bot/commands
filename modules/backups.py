@@ -241,17 +241,20 @@ def create_warning_message(options, redis_key, prefix="backup_"):
         ),
         components=[
             ActionRow(
-                SelectMenu(*[
-                    SelectMenuOption(
-                        label=option_names.get(option, option.replace("_", " ").title()),
-                        value=option,
-                        description=option_descriptions.get(option, "").replace("*", ""),
-                        default=option in options
-                    )
-                    for option in ALLOWED_OPTIONS
-                ],
-                           max_values=len(ALLOWED_OPTIONS), placeholder="Select Loading Options",
-                           custom_id=f"{prefix}load_options", args=[redis_key]),
+                SelectMenu(
+                    *[
+                        SelectMenuOption(
+                            label=option_names.get(option, option.replace("_", " ").title()),
+                            value=option,
+                            description=option_descriptions.get(option, "").replace("*", ""),
+                            default=option in options
+                        )
+                        for option in ALLOWED_OPTIONS
+                    ],
+                    max_values=len(ALLOWED_OPTIONS),
+                    placeholder="Select Loading Options",
+                    custom_id=f"{prefix}load_options",
+                    args=[redis_key]),
             ),
             ActionRow(
                 Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id=f"{prefix}load_confirm",
@@ -729,10 +732,17 @@ class BackupsModule(Module):
                 args=[backup_id]
             ))
 
+        description = ""
+        # members should only be empty for non-premium backups
+        if len(data.members) == 0:
+            description += "This backup doesn't contain any messages, members, or bans! " \
+                           "[⭐ Learn More](https://wiki.xenon.bot/en/premium)\n​"
+
         return dict(
             embeds=[{
                 "title": f"Backup Info - *{data.name}*",
                 "color": Format.INFO.color,
+                "description": description,
                 "footer": {"text": "  ".join(properties)},
                 "fields": [
                     {
@@ -936,7 +946,8 @@ class BackupsModule(Module):
     @Module.component(name="backup_delete_direct")
     async def delete_direct(self, ctx, backup_id):
         await ctx.update(
-            **create_message("Are you sure that you want to delete this backup? **This can not be undone**.", f=Format.WARNING),
+            **create_message("Are you sure that you want to delete this backup? **This can not be undone**.",
+                             f=Format.WARNING),
             components=[ActionRow(
                 Button(label="Confirm", custom_id=f"backup_delete_direct_confirm", args=[backup_id],
                        style=ButtonStyle.SUCCESS),
@@ -1182,6 +1193,7 @@ class BackupsModule(Module):
                 f"The **minimum interval** for your tier is `{MIN_INTERVAL[ctx.premium_level]} hours`.",
                 f=Format.ERROR
             ), ephemeral=True)
+            return
 
         interval_td = timedelta(hours=hours)
 
