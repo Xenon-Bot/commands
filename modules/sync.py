@@ -323,8 +323,7 @@ class SyncModule(Module):
 
             await ctx.respond(**create_message(
                 f"Successfully **created a ban sync** from `{_source_id}` to `{_target_id}` "
-                f"with the id `{sync_id.upper()}`.\n"
-                f"You can copy all existing bans using `/clipboard copy` and `/clipboard paste options: !* bans`.",
+                f"with the id `{sync_id.upper()}`.\n",
                 f=Format.SUCCESS
             ), ephemeral=True)
             await self.bot.db.audit_logs.insert_one({
