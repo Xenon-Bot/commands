@@ -31,6 +31,7 @@ class SyncModule(Module):
         await self.bot.db.premium.syncs.create_index([("guilds", pymongo.ASCENDING)])
         await self.bot.db.premium.syncs.create_index([("target_guild", pymongo.ASCENDING)])
         await self.bot.db.premium.syncs.create_index([("webhook.id", pymongo.ASCENDING)])
+        await self.bot.db.premium.syncs.create_index([("lazy", pymongo.ASCENDING), ("next_lazy", pymongo.ASCENDING)])
 
     @Module.command()
     async def sync(self, ctx):
@@ -271,7 +272,7 @@ class SyncModule(Module):
     @checks.has_permissions_level()
     @checks.bot_has_permissions("ban_members")
     @checks.cooldown(1, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
-    async def bans(self, ctx, direction, server_id, sync_existing=True):
+    async def bans(self, ctx, direction, server_id, sync_existing: bool = True):
         """
         Sync new bans and unbans from one server to another
         """
@@ -368,7 +369,7 @@ class SyncModule(Module):
     @checks.bot_has_permissions("manage_roles")
     @checks.cooldown(1, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
     async def role(self, ctx, role_a: CommandOptionType.ROLE, direction, server_b, role_b, include="arjl",
-                   sync_existing=True):
+                   sync_existing: bool = True):
         """
         Sync role assignments for one role to another
         """
