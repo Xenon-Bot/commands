@@ -18,6 +18,7 @@ class AuditLogType(IntEnum):
     BAN_SYNC_CREATE = 9
     SYNC_DELETE = 10
     ROLE_SYNC_CREATE = 11
+    BACKUP_SYNC_CREATE = 12  # TODO: implement listing and info
 
 
 text_formats = {
@@ -35,7 +36,9 @@ text_formats = {
                                   "the server with the id `{target}` with the id `{id}`",
     AuditLogType.SYNC_DELETE: "<@{user}> deleted a sync with the id `{id}`",
     AuditLogType.ROLE_SYNC_CREATE: "<@{user}> created a role sync from the role with the id {source} to "
-                                   "the role with the id {target} with the id `{id}`",
+                                   "the role with the id `{target}` with the id `{id}`",
+    AuditLogType.BACKUP_SYNC_CREATE: "<@{user}> created a backup sync from the server with the id `{source}` to "
+                                     "the server with the id `{target}` with the id `{id}`",
 }
 
 

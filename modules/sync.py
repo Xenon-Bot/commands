@@ -20,6 +20,7 @@ class SyncType(IntEnum):
     MESSAGES = 0
     BANS = 1
     ROLE = 2
+    BACKUP = 3
 
 
 class SyncModule(Module):
@@ -74,6 +75,9 @@ class SyncModule(Module):
             elif sync["type"] == SyncType.BANS:
                 value = f"Bans from `{sync['source']}` to `{sync['target']}`\n" \
                         f"(`{sync['uses']}` ban(s) transferred)"
+            elif sync["type"] == SyncType.BACKUP:
+                value = f"Backup from `{sync['source']}` to `{sync['target']}`\n" \
+                        f"(`{sync['uses']}` change(s) transferred)"
             else:
                 value = f"Unknown sync type"
 
@@ -271,7 +275,7 @@ class SyncModule(Module):
     @guild_only
     @checks.has_permissions_level()
     @checks.bot_has_permissions("ban_members")
-    @checks.cooldown(1, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
+    @checks.cooldown(2, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
     async def bans(self, ctx, direction, server_id, sync_existing: bool = True):
         """
         Sync new bans and unbans from one server to another
@@ -288,7 +292,7 @@ class SyncModule(Module):
 
         if ctx.guild_id == guild.id:
             await ctx.respond(**create_message(
-                "You can't sync ban between the same servers.",
+                "You can't sync bans between the same servers.",
                 f=Format.ERROR
             ), ephemeral=True)
             return
@@ -366,7 +370,7 @@ class SyncModule(Module):
     @guild_only
     @checks.has_permissions_level()
     @checks.bot_has_permissions("manage_roles")
-    @checks.cooldown(1, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
+    @checks.cooldown(5, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
     async def role(self, ctx, role_a: CommandOptionType.ROLE, direction, server_b, role_b, include="arjl",
                    sync_existing: bool = True):
         """
@@ -471,3 +475,104 @@ class SyncModule(Module):
         if "to" in direction:
             await ctx.count_cooldown()
             await _create_role_sync(ctx.guild_id, role_a, guild.id, role_b)
+
+    @sync.sub_command(extends=dict(
+        direction=dict(
+            choices=SYNC_DIRECTIONS,
+            description="The sync direction"
+        ),
+        server_id="The id of the second sever",
+        include=dict(
+            choices=[
+                ("Only Role Assignments and Nicknames", "e"),
+                ("Only Messages", "m"),
+                ("Only Bans", "b"),
+                ("Messages, Bans, Role Assignments and Nicknames", "em"),
+                ("Only Channels and Roles", "cr"),
+                ("Channels, Roles and Messages", "crm"),
+                ("Channels, Roles and Bans", "crb"),
+                ("All the above", "ecrmb")
+            ],
+            description="Events that should be synced"
+        )
+    ))
+    @guild_only
+    @checks.has_permissions_level()
+    @checks.bot_has_permissions("manage_webhooks")
+    @checks.cooldown(2, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
+    async def backup(self, ctx, direction, server_id, include="ecrmb"):
+        """
+        Sync changes from one server to another after loading a backup
+        """
+        events = {
+            "roles": "r" in include,
+            "channels": "c" in include,
+            "members": "e" in include,
+            "bans": "b" in include,
+            "messages": "m" in include
+        }
+
+        try:
+            guild = await ctx.bot.http.get_guild(server_id)
+        except (rest.HTTPNotFound, rest.HTTPForbidden):
+            await ctx.respond(**create_message(
+                f"**Can't find the server** with the id `{server_id}`. "
+                f"Are you sure that the bot has access to the server?",
+                f=Format.ERROR
+            ), ephemeral=True)
+            return
+
+        if ctx.guild_id == guild.id:
+            await ctx.respond(**create_message(
+                "You can't sync changes between the same servers.",
+                f=Format.ERROR
+            ), ephemeral=True)
+            return
+
+        has_admin = await self._check_admin_on(guild, ctx.author)
+        if not has_admin:
+            await ctx.respond(**create_message(
+                f"You need **administrator permissions** in the target server.",
+                f=Format.ERROR
+            ), ephemeral=True)
+            return
+
+        async def _create_backup_sync(_source_id, _target_id):
+            sync_id = utils.unique_id()
+            try:
+                await ctx.bot.db.premium.syncs.insert_one({
+                    "_id": sync_id,
+                    "guilds": [guild.id, ctx.guild_id],
+                    "type": SyncType.BACKUP,
+                    "target": _target_id,
+                    "source": _source_id,
+                    "events": events,
+                    "uses": 0
+                })
+            except pymongo.errors.DuplicateKeyError:
+                await ctx.respond(**create_message(
+                    f"There is **already a backup sync** from `{_source_id}` to `{_target_id}`.",
+                    f=Format.ERROR
+                ), ephemeral=True)
+                return
+
+            await ctx.respond(**create_message(
+                f"Successfully **created a backup sync** from `{_source_id}` to `{_target_id}` "
+                f"with the id `{sync_id.upper()}`.\n",
+                f=Format.SUCCESS
+            ), ephemeral=True)
+            await self.bot.db.audit_logs.insert_one({
+                "type": AuditLogType.BACKUP_SYNC_CREATE,
+                "timestamp": datetime.utcnow(),
+                "guilds": [ctx.guild_id, guild.id],
+                "user": ctx.author.id,
+                "extra": {"source": _source_id, "target": _target_id, "id": sync_id}
+            })
+
+        if "from" in direction:
+            await ctx.count_cooldown()
+            await _create_backup_sync(guild.id, ctx.guild_id)
+
+        if "to" in direction:
+            await ctx.count_cooldown()
+            await _create_backup_sync(ctx.guild_id, guild.id)
