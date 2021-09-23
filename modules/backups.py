@@ -391,8 +391,35 @@ class BackupsModule(Module):
         else:
             await ctx.respond(**create_warning_message(parsed_options, redis_key), ephemeral=True)
 
+    async def _backup_id_autocomplete(self, ctx, backup_id):
+        redis_key = f"autocomplete:backups:{ctx.author.id}"
+
+        cached = await self.bot.redis.get(redis_key)
+        if cached is not None:
+            backups = json.loads(cached)
+        else:
+            backups = [
+                {"id": backup["_id"], "name": backup["data"]["name"]}
+                async for backup in self.bot.db.backups.find(
+                    {"creator": ctx.author.id},
+                    projection=("data.name", "_id")
+                )
+            ]
+            await self.bot.redis.setex(redis_key, 60, json.dumps(backups))
+
+        backup_id = backup_id.lower().strip()
+        choices = [
+            (f"{backup['id'].upper()} - {backup['name']}", backup["id"].upper())
+            for backup in backups
+            if backup_id in backup["name"].lower() or backup_id in backup["id"].lower()
+        ]
+        return InteractionResponse.autocomplete(*choices[:20])
+
     @backup.sub_command(extends=dict(
-        backup_id="The id of the previously created backup",
+        backup_id=dict(
+            description="The id of the previously created backup",
+            autocomplete=_backup_id_autocomplete
+        ),
         options="A list of options"
     ))
     @checks.guild_only
@@ -746,11 +773,12 @@ class BackupsModule(Module):
 
         await ctx.respond(**data)
 
-    @backup.sub_command(
-        extends=dict(
-            backup_id="The id of the previously created backup"
+    @backup.sub_command(extends=dict(
+        backup_id=dict(
+            description="The id of the previously created backup",
+            autocomplete=_backup_id_autocomplete
         )
-    )
+    ))
     @checks.cooldown(5, 30, bucket=checks.CooldownType.AUTHOR)
     async def info(self, ctx, backup_id: str.strip):
         """
@@ -875,11 +903,12 @@ class BackupsModule(Module):
         data = await self._backup_list_message(ctx.author.id, int(page))
         await ctx.update(**data)
 
-    @backup.sub_command(
-        extends=dict(
-            backup_id="The id of the previously created backup"
+    @backup.sub_command(extends=dict(
+        backup_id=dict(
+            description="The id of the previously created backup",
+            autocomplete=_backup_id_autocomplete
         )
-    )
+    ))
     @checks.cooldown(5, 30, bucket=checks.CooldownType.AUTHOR)
     async def delete(self, ctx, backup_id: str.strip):
         """
