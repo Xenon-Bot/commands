@@ -402,6 +402,7 @@ class BackupsModule(Module):
                 {"id": backup["_id"], "name": backup["data"]["name"]}
                 async for backup in self.bot.db.backups.find(
                     {"creator": ctx.author.id},
+                    sort=[("timestamp", pymongo.DESCENDING)],
                     projection=("data.name", "_id")
                 )
             ]
@@ -409,7 +410,7 @@ class BackupsModule(Module):
 
         backup_id = backup_id.lower().strip()
         choices = [
-            (f"{backup['id'].upper()} - {backup['name']}", backup["id"].upper())
+            (f"{backup['id'].upper()} | {backup['name']}", backup["id"].upper())
             for backup in backups
             if backup_id in backup["name"].lower() or backup_id in backup["id"].lower()
         ]

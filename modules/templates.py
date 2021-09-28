@@ -6,6 +6,7 @@ from grpclib.exceptions import GRPCError
 from dbots.protos import backups_pb2
 import grpclib
 import json
+import pymongo
 
 from .audit_logs import AuditLogType
 from .backups import option_status_list, convert_v1_to_v2, channel_tree, parse_options, create_warning_message
@@ -108,6 +109,7 @@ class TemplatesModule(Module):
                 {"id": template["_id"], "name": template["name"], "description": template["description"]}
                 async for template in self.bot.mongo.dtpl.templates.find(
                     {},
+                    sort=[("upvote_count", pymongo.DESCENDING), ("usage_count", pymongo.DESCENDING)],
                     projection=("name", "description", "_id")
                 )
             ]
