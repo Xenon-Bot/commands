@@ -11,13 +11,14 @@ import grpclib.client
 from dbots.protos import backups_grpc, chatlogs_grpc
 import weakref
 import sentry_sdk
+from os import environ
 
 from util import *
 
 
 class RpcCollection:
-    def __init__(self):
-        channel = grpclib.client.Channel("localhost", 8081)
+    def __init__(self, host):
+        channel = grpclib.client.Channel(*host.split(":"))
         self.backups = backups_grpc.BackupsStub(channel)
         self.chatlogs = chatlogs_grpc.ChatlogsStub(channel)
 
@@ -31,7 +32,7 @@ class Xenon(InteractionBot):
         self.http = None
         self.relay = None
 
-        self.rpc = RpcCollection()
+        self.rpc = RpcCollection(env.get("BACKUPS_SERVICE", "127.0.0.1:8081"))
 
         self.component(self._delete_button, name="delete")
 
