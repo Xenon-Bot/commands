@@ -46,11 +46,12 @@ async def prepare_bot(*_):
     await bot.setup(env.get("REDIS_URL", "redis://localhost"))
     # await bot.http.replace_guild_commands(bot.guild_id, [])
     # await bot.http.replace_global_commands([])
-    # await bot.push_commands()
+    await bot.push_commands()
 
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     loop.set_default_executor(ThreadPoolExecutor(max_workers=10))
     app.add_routes([web.post("/entry", bot.aiohttp_entry)])
-    web.run_app(app, host=env.get("HOST", "127.0.0.1"), port=env.get("PORT"))
+    host = env.get("HOST", "127.0.0.1:8080").split(":")
+    web.run_app(app, host=host[0], port=int(host[1]))

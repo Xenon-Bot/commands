@@ -10,11 +10,12 @@ from datetime import datetime
 import grpclib.client
 from dbots.protos import backups_grpc
 import sentry_sdk
+from os import environ
 
 
 class RpcCollection:
-    def __init__(self):
-        self.backups = backups_grpc.BackupsStub(grpclib.client.Channel("localhost", 8081))
+    def __init__(self, host):
+        self.backups = backups_grpc.BackupsStub(grpclib.client.Channel(*host.split(":")))
 
 
 class Xenon(InteractionBot):
@@ -26,7 +27,7 @@ class Xenon(InteractionBot):
         self.http = None
         self.relay = None
 
-        self.rpc = RpcCollection()
+        self.rpc = RpcCollection(env.get("BACKUPS_SERVICE", "127.0.0.1:8081"))
 
         self.component(self._delete_button, name="delete")
 
