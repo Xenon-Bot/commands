@@ -110,6 +110,7 @@ class TemplatesModule(Module):
                 async for template in self.bot.mongo.dtpl.templates.find(
                     {},
                     sort=[("upvote_count", pymongo.DESCENDING), ("usage_count", pymongo.DESCENDING)],
+                    allow_disk_use=True,
                     projection=("name", "description", "_id")
                 )
             ]
