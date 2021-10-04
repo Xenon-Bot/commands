@@ -125,10 +125,13 @@ class Xenon(InteractionBot):
         return await super().execute_command(command, payload, remaining_options)
 
     async def get_invite(self):
+        return "https://discord.com/api/oauth2/authorize" \
+               "?client_id=524652984425250847&permissions=8&scope=applications.commands%20bot"
+
         if self._invite:
             return self._invite
 
-        invite = "https://xenon.bot/invite"
+        invite = "https://xenon.bot/premium/invite"
         while "discord.com" not in invite:
             async with self.session.get(invite, allow_redirects=False) as resp:
                 if 400 > resp.status >= 300:
