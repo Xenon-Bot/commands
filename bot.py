@@ -105,7 +105,6 @@ class Xenon(InteractionBot):
                     f=Format.ERROR
                 ), ephemeral=True)
 
-
         raw_premium_level = await self.redis.hget("premium:users", payload.author.id) or "0"
         payload.premium_level = PremiumLevel(int(raw_premium_level))
 
