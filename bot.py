@@ -11,7 +11,7 @@ import grpclib.client
 from dbots.protos import backups_grpc, chatlogs_grpc
 import weakref
 import sentry_sdk
-from os import environ
+import functools
 
 from util import *
 
@@ -28,9 +28,8 @@ class Xenon(InteractionBot):
         super().__init__(**kwargs)
         self.mongo = AsyncIOMotorClient(env.get("MONGO_URL", "mongodb://localhost"))
         self.db = self.mongo.xenon
-        self.redis = None
-        self.http = None
-        self.relay = None
+        self._invite = None
+        self._support_invite = None
 
         self.rpc = RpcCollection(env.get("BACKUPS_SERVICE", "127.0.0.1:8081"))
 
@@ -73,7 +72,7 @@ class Xenon(InteractionBot):
             try:
                 await ctx.respond(**create_message(
                     "An unexpected error occurred. Please report this on the "
-                    "[Support Server](https://xenon.bot/discord).\n\n"
+                    f"[Support Server](<{await ctx.bot.get_support_invite()}>).\n\n"
                     f"**Error Code**: `{error_id.upper()}`",
                     f=Format.ERROR
                 ), ephemeral=True)
@@ -124,3 +123,33 @@ class Xenon(InteractionBot):
             )
 
         return await super().execute_command(command, payload, remaining_options)
+
+    async def get_invite(self):
+        if self._invite:
+            return self._invite
+
+        invite = "https://xenon.bot/invite"
+        while "discord.com" not in invite:
+            async with self.session.get(invite, allow_redirects=False) as resp:
+                if 400 > resp.status >= 300:
+                    invite = resp.headers["Location"]
+                else:
+                    break
+
+        self._invite = invite
+        return invite
+
+    async def get_support_invite(self):
+        if self._support_invite:
+            return self._support_invite
+
+        invite = "https://xenon.bot/discord"
+        while "discord.com" not in invite:
+            async with self.session.get(invite, allow_redirects=False) as resp:
+                if 400 > resp.status >= 300:
+                    invite = resp.headers["Location"]
+                else:
+                    break
+
+        self._support_invite = invite
+        return invite

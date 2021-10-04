@@ -69,7 +69,7 @@ class BasicsModule(Module):
                 "Please visit our wiki or join our support discord if you need further help.\n​",
                 components=[ActionRow(
                     Button(label="Wiki", url="https://wiki.xenon.bot", emoji="📚"),
-                    Button(label="Support", url="https://xenon.bot/discord", emoji="❔"),
+                    Button(label="Support", url=await ctx.bot.get_support_invite(), emoji="❔"),
                     Button(label="Templates", url="https://templates.xenon.bot", emoji="🖼️"),
                     Button(label="Twitter", url="https://twitter.com/xenon_bot", emoji="🐦"),
                     Button(label="Premium", url="https://xenon.bot/patreon", emoji="⭐")
@@ -112,14 +112,9 @@ class BasicsModule(Module):
         Invite Xenon to your server
         """
         await ctx.respond(
-            f"Click [here](<https://discord.com/api/oauth2/authorize?client_id=524652984425250847&permissions=8&"
-            f"scope=applications.commands%20bot>) to **invite Xenon** to your server.",
+            f"Click [here](<{await ctx.bot.get_invite()}>) to **invite Xenon** to your server.",
             components=[ActionRow(
-                Button(
-                    label="Invite Xenon",
-                    url="https://discord.com/api/oauth2/authorize?client_id=524652984425250847&permissions=8&"
-                        "scope=applications.commands%20bot"
-                ),
+                Button(label="Invite Xenon", url=await ctx.bot.get_invite()),
             )],
             ephemeral=True
         )
@@ -130,9 +125,9 @@ class BasicsModule(Module):
         Join the support server and get some help
         """
         await ctx.respond(
-            f"Click [here](<https://xenon.bot/discord>) to join the support server.",
+            f"Click [here](<{await ctx.bot.get_support_invite()}>) to join the support server.",
             components=[ActionRow(
-                Button(label="Support Server", url="https://xenon.bot/discord"),
+                Button(label="Support Server", url=await ctx.bot.get_support_invite()),
             )],
             ephemeral=True
         )
