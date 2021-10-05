@@ -15,7 +15,7 @@ ALLOWED_OPTIONS = ("delete_roles", "delete_channels", "roles", "channels", "sett
 
 class TemplatesModule(Module):
     async def _get_template(self, identifier):
-        template = await self.bot.mongo.dtpl.templates.find_one({
+        template = await self.bot.db.templates.find_one({
             "internal": True,
             "$or": [{"name": identifier}, {"_id": identifier}]
         })
