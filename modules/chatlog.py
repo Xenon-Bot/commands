@@ -515,11 +515,6 @@ class ChatlogModule(Module):
             if doc is None:
                 return None, None
 
-        if doc.get("version") != 2:
-            data = convert_v1_to_v2(doc["data"])
-            del doc["data"]
-            return doc, data
-
         data = chatlogs_pb2.ChatlogData()
         await self.bot.loop.run_in_executor(None, lambda: data.ParseFromString(brotli.decompress(doc["data"]["raw"])))
         del doc["data"]
