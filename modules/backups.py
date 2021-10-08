@@ -1231,11 +1231,6 @@ class BackupsModule(Module):
             if doc is None:
                 return None, None
 
-        if doc.get("version") != 2:
-            data = convert_v1_to_v2(doc["data"])
-            del doc["data"]
-            return doc, data
-
         if doc.get("large"):
             grid_out = await self.grid_fs.open_download_stream(doc["data"]["raw"])
             doc["data"]["raw"] = await grid_out.read()
