@@ -80,8 +80,12 @@ class Xenon(InteractionBot):
                 pass
 
     async def execute_component(self, component, payload, args):
-        raw_premium_level = await self.redis.hget("premium:users", payload.author.id) or "0"
-        payload.premium_level = PremiumLevel(int(raw_premium_level))
+        premium_level = 0
+        user_doc = await self.db.users.find_one({"_id": payload.author.id})
+        if user_doc is not None:
+            premium_level = user_doc.get("tier", 0)
+
+        payload.premium_level = PremiumLevel(premium_level)
         return await super().execute_component(component, payload, args)
 
     async def execute_command(self, command, payload, remaining_options):
@@ -105,8 +109,12 @@ class Xenon(InteractionBot):
                     f=Format.ERROR
                 ), ephemeral=True)
 
-        raw_premium_level = await self.redis.hget("premium:users", payload.author.id) or "0"
-        payload.premium_level = PremiumLevel(int(raw_premium_level))
+        premium_level = 0
+        user_doc = await self.db.users.find_one({"_id": payload.author.id})
+        if user_doc is not None:
+            premium_level = user_doc.get("tier", 0)
+
+        payload.premium_level = PremiumLevel(premium_level)
 
         allowed_commands = {
             "settings show", "settings permissions", "settings reset", "leave", "ping", "support", "audit logs", "help"
