@@ -53,7 +53,7 @@ class ExportModule(Module):
     ))
     @has_permissions_level()
     @checks.cooldown(1, 15, bucket=checks.CooldownType.AUTHOR)
-    async def channels(self, ctx):
+    async def channels(self, ctx, format):
         """
         Export all channels as JSON or CSV
         """
@@ -61,7 +61,7 @@ class ExportModule(Module):
 
         data = [c.to_dict() for c in channels]
 
-        file_name = "channels"
+        file_name = f"channels_{ctx.guild_id}"
         await ctx.respond(files=[rest.File(
             _data_to_fp(data, _format=format),
             filename=f"{file_name}.{format}"
@@ -86,7 +86,7 @@ class ExportModule(Module):
                 if c.parent_id == channel.id
             ]
 
-        file_name = channel.name.replace(" ", "_").lower()
+        file_name = f"{channel.name.replace(' ', '_').lower()}_{channel.id}"
         await ctx.respond(files=[rest.File(
             _data_to_fp(data, _format="json"),
             filename=f"{file_name}.json"
@@ -97,15 +97,15 @@ class ExportModule(Module):
     ))
     @has_permissions_level()
     @checks.cooldown(1, 15, bucket=checks.CooldownType.AUTHOR)
-    async def roles(self, ctx):
+    async def roles(self, ctx, format):
         """
         Export all roles as JSON or CSV
         """
-        roles = await ctx.fetch_guild_channels()
+        roles = await ctx.fetch_guild_roles()
 
         data = [r.to_dict() for r in roles]
 
-        file_name = "roles"
+        file_name = f"roles_{ctx.guild_id}"
         await ctx.respond(files=[rest.File(
             _data_to_fp(data, _format=format),
             filename=f"{file_name}.{format}"
@@ -123,7 +123,7 @@ class ExportModule(Module):
         role = ctx.resolved.roles[role]
 
         data = role.to_dict()
-        file_name = role.name.replace(" ", "_").lower()
+        file_name = f"{role.name.replace(' ', '_').lower()}_{role.id}"
         await ctx.respond(files=[rest.File(
             _data_to_fp(data, _format="json"),
             filename=f"{file_name}.json"
@@ -135,7 +135,7 @@ class ExportModule(Module):
     @has_permissions_level()
     @bot_has_permissions(ban_members=True)
     @checks.cooldown(1, 30, bucket=checks.CooldownType.AUTHOR)
-    async def bans(self, ctx):
+    async def bans(self, ctx, format):
         """
         Export all bans as JSON or CSV
         """
@@ -153,7 +153,7 @@ class ExportModule(Module):
                 for ban in data
             ]
 
-        file_name = "bans"
+        file_name = f"bans_{ctx.guild_id}"
         await ctx.respond(files=[rest.File(
             _data_to_fp(data, _format=format),
             filename=f"{file_name}.{format}"
@@ -192,7 +192,7 @@ class ExportModule(Module):
             return
 
         data = message.to_dict()
-        file_name = "message"
+        file_name = f"message_{message.id}"
         await ctx.respond(files=[rest.File(
             _data_to_fp(data, _format="json"),
             filename=f"{file_name}.json"
@@ -235,7 +235,6 @@ class ExportModule(Module):
 
         data = []
         for reaction in message.reactions:
-            print(len(data))
             after = "0"
             if reaction.emoji.get("id"):
                 emoji = f"{reaction.emoji['name']}:{reaction.emoji['id']}"
@@ -262,7 +261,7 @@ class ExportModule(Module):
             except (rest.HTTPNotFound, rest.HTTPBadRequest):
                 pass
 
-        file_name = "reactions"
+        file_name = f"reactions_{message.id}"
         await ctx.respond(files=[rest.File(
             _data_to_fp(data, _format=format),
             filename=f"{file_name}.{format}"
