@@ -6,7 +6,7 @@ import sentry_sdk
 from dbots.cmd import *
 
 from bot import Xenon
-from modules import backups, basics, settings, audit_logs, templates, premium, admin, clone, encryption
+from modules import backups, basics, settings, audit_logs, templates, premium, admin, clone, encryption, export
 
 if env.get("SENTRY"):
     sentry_sdk.init(
@@ -34,6 +34,7 @@ modules = {
     admin.AdminModule,
     clone.CloneModule,
     # encryption.EncryptionModule
+    export.ExportModule
 }
 for module in modules:
     bot.load_module(module(bot))
