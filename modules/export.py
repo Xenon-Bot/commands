@@ -5,6 +5,8 @@ import json
 import csv
 import re
 
+from .premium import PREMIUM_ONLY_TEXT, PREMIUM_COMPONENTS
+
 
 def _data_to_fp(data, _format):
     if _format == "json":
@@ -139,25 +141,8 @@ class ExportModule(Module):
         """
         Export all bans as JSON or CSV
         """
-        bans = await ctx.bot.http.get_guild_bans(ctx.guild_id)
-        data = bans
-
-        if format == "csv":
-            data = [
-                {
-                    "user_id": ban["user"]["id"],
-                    "user_username": ban["user"]["username"],
-                    "user_discriminator": ban["user"]["discriminator"],
-                    "reason": ban.get("reason")
-                }
-                for ban in data
-            ]
-
-        file_name = f"bans_{ctx.guild_id}"
-        await ctx.respond(files=[rest.File(
-            _data_to_fp(data, _format=format),
-            filename=f"{file_name}.{format}"
-        )], ephemeral=True)
+        await ctx.respond(PREMIUM_ONLY_TEXT, components=PREMIUM_COMPONENTS, ephemeral=True)
+        return
 
     @export.sub_command(extends=dict(
         message="The id or url of the message that you want to export"
@@ -169,34 +154,8 @@ class ExportModule(Module):
         """
         Export a message as JSON
         """
-        channel_id, message_id = _parse_message_id(ctx.channel_id, message)
-
-        channels = await ctx.fetch_guild_channels()
-        for channel in channels:
-            if channel.id == channel_id:
-                break
-        else:
-            await ctx.respond(**create_message(
-                "The channel doesn't exist or doesn't belong to this server.",
-                f=Format.ERROR
-            ), ephemeral=True)
-            return
-
-        try:
-            message = await ctx.bot.http.get_channel_message(channel_id, message_id)
-        except (rest.HTTPNotFound, rest.HTTPBadRequest):
-            await ctx.respond(**create_message(
-                "The message doesn't exist or doesn't belong to this channel.",
-                f=Format.ERROR
-            ), ephemeral=True)
-            return
-
-        data = message.to_dict()
-        file_name = f"message_{message.id}"
-        await ctx.respond(files=[rest.File(
-            _data_to_fp(data, _format="json"),
-            filename=f"{file_name}.json"
-        )], ephemeral=True)
+        await ctx.respond(PREMIUM_ONLY_TEXT, components=PREMIUM_COMPONENTS, ephemeral=True)
+        return
 
     @export.sub_command(extends=dict(
         message="The id or url of the message that you want to export",
@@ -209,60 +168,5 @@ class ExportModule(Module):
         """
         Export the reactions from a message as JSON or CSV
         """
-        channel_id, message_id = _parse_message_id(ctx.channel_id, message)
-
-        channels = await ctx.fetch_guild_channels()
-        for channel in channels:
-            if channel.id == channel_id:
-                break
-        else:
-            await ctx.respond(**create_message(
-                "The channel doesn't exist or doesn't belong to this server.",
-                f=Format.ERROR
-            ), ephemeral=True)
-            return
-
-        try:
-            message = await ctx.bot.http.get_channel_message(channel_id, message_id)
-        except (rest.HTTPNotFound, rest.HTTPBadRequest):
-            await ctx.respond(**create_message(
-                "The message doesn't exist or doesn't belong to this channel.",
-                f=Format.ERROR
-            ), ephemeral=True)
-            return
-
-        await ctx.count_cooldown()
-
-        data = []
-        for reaction in message.reactions:
-            after = "0"
-            if reaction.emoji.get("id"):
-                emoji = f"{reaction.emoji['name']}:{reaction.emoji['id']}"
-            else:
-                emoji = reaction.emoji["name"]
-
-            try:
-                users = await ctx.bot.http.get_reactions(channel_id, message_id, emoji, limit=100)
-                while len(users) > 0:
-                    for user in users:
-                        after = user.id
-                        if format == "csv":
-                            data.append({
-                                "user_id": user.id,
-                                "user_username": user.name,
-                                "user_discriminator": user.discriminator,
-                                "emoji": emoji
-                            })
-                        else:
-                            data.append({"user": user.to_dict(), "emoji": reaction.emoji})
-
-                    users = await ctx.bot.http.get_reactions(channel_id, message_id, emoji, limit=100, after=after)
-
-            except (rest.HTTPNotFound, rest.HTTPBadRequest):
-                pass
-
-        file_name = f"reactions_{message.id}"
-        await ctx.respond(files=[rest.File(
-            _data_to_fp(data, _format=format),
-            filename=f"{file_name}.{format}"
-        )], ephemeral=True)
+        await ctx.respond(PREMIUM_ONLY_TEXT, components=PREMIUM_COMPONENTS, ephemeral=True)
+        return
