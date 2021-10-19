@@ -22,9 +22,7 @@ class TemplatesModule(Module):
         if template is not None:
             return template
 
-        match = re.match(r"https?://discord.new/(\w+)/?", identifier)
-        if match:
-            identifier = match.group(1)
+        identifier = identifier.strip("/").split("/")[-1].strip()
 
         cached = await self.bot.redis.get(f"template:{identifier}")
         if cached is not None:
