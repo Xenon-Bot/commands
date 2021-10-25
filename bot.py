@@ -95,7 +95,7 @@ class Xenon(InteractionBot):
         if blacklist is None and payload.guild_id:
             blacklist = await self.db.blacklist.find_one({"_id": payload.guild_id})
 
-        if blacklist is not None:
+        if blacklist is not None and command.full_name not in {"opt out", "opt in"}:
             if blacklist.get("guild"):
                 return InteractionResponse.message(**create_message(
                     "This server is **no longer allowed to use this bot** for the following reason:"
