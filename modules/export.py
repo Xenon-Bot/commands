@@ -204,7 +204,7 @@ class ExportModule(Module):
     ))
     @has_permissions(manage_messages=True)
     @bot_has_permissions(read_message_history=True, manage_messages=True)
-    @checks.cooldown(1, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
+    @checks.cooldown(2, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
     async def reactions(self, ctx, message, format):
         """
         Export the reactions from a message as JSON or CSV
