@@ -270,6 +270,12 @@ class ChatlogModule(Module):
             ), ephemeral=True)
             return
 
+        first_mesasge_id = "-"
+        last_message_id = "-"
+        if len(data.messages) != 0:
+            first_message_id = data.messages[-1].id
+            last_message_id = data.messages[0].id
+
         await ctx.respond(embeds=[{
             "description": f"**Chatlog Info - <#{props['channel']}>**",
             "color": Format.INFO.color,
@@ -286,12 +292,12 @@ class ChatlogModule(Module):
                 },
                 {
                     "name": "First Message",
-                    "value": f"`{data.messages[-1].id}`",
+                    "value": f"`{first_mesasge_id}`",
                     "inline": True
                 },
                 {
                     "name": "Last Message",
-                    "value": f"`{data.messages[0].id}`",
+                    "value": f"`{last_message_id}`",
                     "inline": True
                 },
             ]
