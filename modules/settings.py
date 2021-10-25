@@ -159,7 +159,7 @@ class SettingsModule(Module):
         Opt in to end-user-data collection for your discord account (if you have previously opted out)
         """
         await ctx.bot.db.users.update_one({"_id": ctx.author.id}, {"$set": {"privacy_opt_out": False}})
-        await ctx.update(**create_message(
+        await ctx.respond(**create_message(
             "Okay, your have **opted in** and we may collect and process your end-user-data again.",
             f=Format.SUCCESS
         ))
