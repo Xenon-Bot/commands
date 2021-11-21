@@ -228,10 +228,19 @@ class ChatlogModule(Module):
             f=Format.INFO
         ))
 
+        guild = await ctx.fetch_guild()
+        if guild.premium_tier == PremiumTier.TIER_2:
+            max_file_size = 50e6
+        elif guild.premium_tier == PremiumTier.TIER_3:
+            max_file_size = 100e6
+        else:
+            max_file_size = 8e6
+
         try:
             await self.bot.rpc.chatlogs.Load(chatlogs_pb2.LoadRequest(
                 channel_id=ctx.channel_id,
                 message_count=message_count,
+                max_file_size=max_file_size,
                 data=data
             ))
         except GRPCError as e:
