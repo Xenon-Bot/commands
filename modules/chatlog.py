@@ -240,7 +240,7 @@ class ChatlogModule(Module):
             await self.bot.rpc.chatlogs.Load(chatlogs_pb2.LoadRequest(
                 channel_id=ctx.channel_id,
                 message_count=message_count,
-                max_file_size=max_file_size,
+                max_file_size=int(max_file_size),
                 data=data
             ))
         except GRPCError as e:
