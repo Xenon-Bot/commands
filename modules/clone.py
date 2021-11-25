@@ -134,7 +134,7 @@ class CloneModule(Module):
                         })
 
                 if apply:
-                    await ctx.bot.http.edit_channel(channel, permission_overwrites=overwrites)
+                    await ctx.bot.http.edit_channel(channel, permission_overwrites=overwrites[:100])
 
         await ctx.respond(**create_message(
             f"Successfully **cloned the role**: <@&{new_role.id}>.",
