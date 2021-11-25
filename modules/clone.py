@@ -108,6 +108,7 @@ class CloneModule(Module):
                 "There are already **250 roles in this server**. Delete one to be able to create a new one.",
                 f=Format.ERROR
             ), ephemeral=True)
+            return
 
         new_role = await ctx.bot.http.create_guild_role(ctx.guild_id, **role.to_dict())
         if apply_overwrites:
