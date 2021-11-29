@@ -57,13 +57,24 @@ class Xenon(InteractionBot):
             print("Command Error:\n", tb, file=sys.stderr)
 
             error_id = unique_id()
+            name = None
+            args = None
+            if isinstance(ctx, CommandContext):
+                name = ctx.command.full_name
+                args = {arg.name: arg.value for arg in ctx.args}
+            elif isinstance(ctx, ComponentContext):
+                name = ctx.component.name
+            elif isinstance(ctx, ModalContext):
+                name = ctx.modal.name
+
             await self.redis.setex(f"cmd:errors:{error_id}", 60 * 60 * 24, json.dumps({
-                "command": ctx.command.full_name,
-                "args": {arg.name: arg.value for arg in ctx.args},
+                "command": name,
+                "args": args,
                 "timestamp": datetime.utcnow().timestamp(),
                 "author": ctx.author.id,
                 "traceback": tb
             }))
+
             try:
                 await ctx.respond(**create_message(
                     "An unexpected error occurred. Please report this on the "
