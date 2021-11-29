@@ -7,7 +7,7 @@ from dbots.cmd import *
 
 from bot import Xenon
 from modules import backups, basics, settings, audit_logs, templates, admin, clone, encryption, chatlog, clipboard, \
-    sync, export
+    sync, export, mutations
 
 if env.get("SENTRY"):
     sentry_sdk.init(
@@ -37,7 +37,8 @@ modules = {
     chatlog.ChatlogModule,
     clipboard.ClipboardModule,
     sync.SyncModule,
-    export.ExportModule
+    export.ExportModule,
+    mutations.MutationsModule
 }
 for module in modules:
     bot.load_module(module(bot))

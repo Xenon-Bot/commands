@@ -8,19 +8,24 @@ import traceback
 import sys
 from datetime import datetime
 import grpclib.client
-from dbots.protos import backups_grpc, chatlogs_grpc
-import weakref
+from dbots.protos import backups_grpc, chatlogs_grpc, mutations_grpc
+from dbots.protos.isolator import service_grpc as isolator_grpc
 import sentry_sdk
-import functools
 
 from util import *
 
 
 class RpcCollection:
-    def __init__(self, host):
+    def __init__(self):
+        host = env.get("BACKUPS_SERVICE", "127.0.0.1:8081")
         channel = grpclib.client.Channel(*host.split(":"))
         self.backups = backups_grpc.BackupsStub(channel)
         self.chatlogs = chatlogs_grpc.ChatlogsStub(channel)
+        self.mutations = mutations_grpc.MutationsStub(channel)
+
+        isolator_host = env.get("ISOLATOR_SERVICE", "127.0.0.1:50051")
+        isolator_channel = grpclib.client.Channel(*isolator_host.split(":"))
+        self.isolator = isolator_grpc.IsolatorStub(isolator_channel)
 
 
 class Xenon(InteractionBot):
@@ -31,7 +36,7 @@ class Xenon(InteractionBot):
         self._invite = None
         self._support_invite = None
 
-        self.rpc = RpcCollection(env.get("BACKUPS_SERVICE", "127.0.0.1:8081"))
+        self.rpc = RpcCollection()
 
         self.component(self._delete_button, name="delete")
 
