@@ -95,7 +95,7 @@ class SyncModule(Module):
             title="Sync List",
             fields=fields,
             color=Format.INFO.color,
-            description=f"{description}\n​"
+            description=f"{description}\n"
         )], ephemeral=True)
 
     @sync.sub_command(extends=dict(
@@ -145,7 +145,8 @@ class SyncModule(Module):
                 ("Only Send", ""),
                 ("Send and Edit", "e"),
                 ("Send and Delete", "d"),
-                ("Send, Edit and Delete", "ed")
+                ("Send, Edit and Delete", "ed"),
+                ("Send, Edit, Delete and Threads", "edt")
             ],
             description="Events that should be synced"
         )
@@ -154,14 +155,15 @@ class SyncModule(Module):
     @checks.has_permissions_level()
     @checks.bot_has_permissions("manage_webhooks")
     @checks.cooldown(25, 60 * 30, bucket=checks.CooldownType.AUTHOR, manual=True)
-    async def messages(self, ctx, direction, channel, include="ed"):
+    async def messages(self, ctx, direction, channel, include="edt"):
         """
         Sync new messages from one channel to another
         """
         events = {
             "send": True,
             "edit": "e" in include,
-            "delete": "d" in include
+            "delete": "d" in include,
+            "threads": "t" in include
         }
 
         channel_match = re.search(r"[0-9]+", channel)
