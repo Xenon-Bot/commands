@@ -412,7 +412,16 @@ class SyncModule(Module):
             ))
             return
 
-        role_b = guild.get_role(role_b)
+        role_b_match = re.search(r"[0-9]+", role_b)
+        if role_b_match is None:
+            await ctx.respond(**create_message(
+                f"`{role_b}` is **not a valid role**. "
+                f"Please mention the role using `@` or use the channel id.",
+                f=Format.ERROR
+            ), ephemeral=True)
+            return
+
+        role_b = guild.get_role(role_b_match[0])
         if role_b is None:
             await ctx.respond(**create_message(
                 f"**Can't find role_b** on server_b.",
