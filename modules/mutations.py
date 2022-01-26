@@ -20,16 +20,25 @@ __applyMutations(guild);
 """
 
 
+mutation_descriptions = {
+    MutationType.CHANNEL_CREATE: "channel(s) will be created",
+    MutationType.CHANNEL_UPDATE: "channel(s) will be updated",
+    MutationType.CHANNEL_DELETE: "channel(s) will be deleted",
+    MutationType.ROLE_CREATE: "role(s) will created",
+    MutationType.ROLE_UPDATE: "role(s) will be updated",
+    MutationType.ROLE_DELETE: "role(s) will be deleted"
+}
+
+
 def mutation_list(mutations):
     def count_by_type(_type):
         return len([m for m in mutations if m["kind"] == _type])
 
-    return f"- {count_by_type(MutationType.CHANNEL_CREATE)} Channels will be created\n" \
-           f"- {count_by_type(MutationType.CHANNEL_UPDATE)} Channels will be updated\n" \
-           f"- {count_by_type(MutationType.CHANNEL_DELETE)} Channels will be deleted\n" \
-           f"- {count_by_type(MutationType.ROLE_CREATE)} Roles will be created\n" \
-           f"- {count_by_type(MutationType.ROLE_UPDATE)} Roles will be updated\n" \
-           f"- {count_by_type(MutationType.ROLE_DELETE)} Roles will be deleted\n"
+    return "\n".join([
+        f"- **{count_by_type(t)}** {d}"
+        for t, d in mutation_descriptions.items()
+        if count_by_type(t) > 0
+    ])
 
 
 class MutationsModule(Module):
@@ -161,7 +170,16 @@ class MutationsModule(Module):
 
     @Module.component(name="mutate_script_confirm")
     async def script_confirm(self, ctx, redis_key):
-        pass
+        scope = await ctx.bot.redis.get(redis_key)
+        if scope is None:
+            await ctx.update(**create_message(
+                "You were too slow, try again with `/mutate script`",
+                f=Format.ERROR
+            ))
+            return
+
+        scope = json.loads(scope)
+        mutations = scope["mutations"]
 
     @Module.component(name="mutate_script_cancel")
     async def script_cancel(self, ctx, redis_key):
