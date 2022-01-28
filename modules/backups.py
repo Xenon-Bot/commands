@@ -247,13 +247,19 @@ def create_warning_message(options, redis_key, prefix="backup_"):
 def create_advanced_options_message(form_id, redis_key, prefix="backup_"):
     return dict(
         **create_message(
-            "Please click below to open the website and make changes to the advanced options!",
+            "The advanced loading options allow you to **define which channels and "
+            "roles should be deleted or loaded**. \n\n"
+            "*Make sure to save your changes on the website and then click the button below to continue the loading"
+            " process. Changes to the advanced options will not be reflected by this "
+            "message or the warning message.* \n\n"
+            "Open the website by clicking below to update the advanced settings.",
             f=Format.INFO
         ),
         components=[
             ActionRow(
-                Button(label="Open Website", style=ButtonStyle.LINK, url=f"https://xenon.bot/forms/{form_id}"),
-                Button(label="I'm Done", style=ButtonStyle.SUCCESS, custom_id=f"{prefix}load_advanced_done", args=[redis_key]),
+                Button(label="Open Website", style=ButtonStyle.LINK, url=f"https://xenon.bot/forms/load/{form_id}"),
+                Button(label="I'm Done", style=ButtonStyle.SUCCESS, custom_id=f"{prefix}load_advanced_done",
+                       args=[redis_key]),
             )
         ]
     )
@@ -460,6 +466,60 @@ class BackupsModule(Module):
         await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps(scope))
         await ctx.update(**create_warning_message(scope["options"], redis_key))
 
+    async def _get_load_advanced_meta(self, ctx, backup_id):
+        guild_roles = await ctx.fetch_guild_roles()
+        guild_channels = await ctx.fetch_guild_channels()
+
+        _, data = await self._retrieve_backup(ctx.author.id, backup_id)
+
+        return {
+            "user_id": ctx.author.id,
+            "guild": {
+                "id": ctx.guild_id,
+                "roles": [
+                    {
+                        "id": r.id,
+                        "name": r.name,
+                        "position": r.position,
+                        "color": r.color,
+                        "managed": r.managed
+                    }
+                    for r in guild_roles
+                ],
+                "channels": [
+                    {
+                        "id": c.id,
+                        "name": c.name,
+                        "parent_id": c.parent_id,
+                        "type": c.type.value
+                    }
+                    for c in guild_channels
+                ]
+            },
+            "backup": {
+                "id": backup_id,
+                "roles": [
+                    {
+                        "id": r.id,
+                        "name": r.name,
+                        "position": r.position,
+                        "color": r.color,
+                        "managed": r.managed
+                    }
+                    for r in data.roles
+                ],
+                "channels": [
+                    {
+                        "id": c.id,
+                        "name": c.name,
+                        "parent_id": c.parent_id,
+                        "type": c.type
+                    }
+                    for c in data.channels
+                ]
+            }
+        }
+
     @Module.component(name="backup_load_advanced")
     async def load_advanced(self, ctx, redis_key):
         scope = await ctx.bot.redis.get(redis_key)
@@ -471,22 +531,11 @@ class BackupsModule(Module):
             return
 
         scope = json.loads(scope)
-        form_id = scope["form_id"]
+        backup_id, form_id = scope["backup_id"], scope["form_id"]
 
         meta = await ctx.bot.redis.hget(f"forms:{form_id}", "meta")
         if meta is None:
-            # TODO: collect meta data for the form
-            meta = {
-                "guild": {
-                    "channels": [],
-                    "roles": []
-                },
-                "backup": {
-                    "channels": [],
-                    "roles": []
-                }
-            }
-
+            meta = await self._get_load_advanced_meta(ctx, backup_id)
             await ctx.bot.redis.hset(f"forms:{form_id}", "meta", json.dumps(meta))
 
         await ctx.bot.redis.expire(f"forms:{form_id}", 60 * 10)
@@ -510,7 +559,11 @@ class BackupsModule(Module):
 
     @Module.component(name="backup_load_cancel")
     async def load_cancel(self, ctx, redis_key):
-        await ctx.bot.redis.delete(redis_key)
+        scope = await ctx.bot.redis.get(redis_key)
+        if scope is not None:
+            scope = json.loads(scope)
+            await ctx.bot.redis.delete(redis_key, f"forms:{scope['form_id']}")
+
         await ctx.update(**create_message(
             "The loading process has been **cancelled**.\n\n"
             "Use `/backup load` to try again.",
@@ -530,12 +583,13 @@ class BackupsModule(Module):
         scope = json.loads(scope)
         backup_id, form_id, options = scope["backup_id"], scope["form_id"], scope["options"]
 
-        # TODO: do something with the advanced settings
         advanced = await ctx.bot.redis.hget(f"forms:{form_id}", "data")
         if advanced is not None:
             advanced = json.loads(advanced)
         else:
             advanced = {}
+
+        await ctx.bot.redis.delete(redis_key, f"forms:{form_id}")
 
         props, data = await self._retrieve_backup(ctx.author.id, backup_id)
         if data is None:
@@ -591,7 +645,9 @@ class BackupsModule(Module):
                 message_count=0,
                 data=data,
                 reason="Backup loaded by " + str(ctx.author),
-                ids=ids
+                ids=ids,
+                exclude_delete_ids=advanced.get("exclude_delete_ids", []),
+                exclude_load_ids=advanced.get("exclude_load_ids", [])
             ))
         except GRPCError as e:
             if e.status == grpclib.Status.ALREADY_EXISTS:
