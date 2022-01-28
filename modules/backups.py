@@ -236,7 +236,24 @@ def create_warning_message(options, redis_key, prefix="backup_"):
             ActionRow(
                 Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id=f"{prefix}load_confirm",
                        args=[redis_key]),
-                Button(label="Cancel", style=ButtonStyle.DANGER, custom_id=f"{prefix}load_cancel", args=[redis_key])
+                Button(label="Cancel", style=ButtonStyle.DANGER, custom_id=f"{prefix}load_cancel", args=[redis_key]),
+                Button(label="Advanced Options", style=ButtonStyle.PRIMARY, custom_id=f"{prefix}load_advanced",
+                       args=[redis_key])
+            )
+        ]
+    )
+
+
+def create_advanced_options_message(form_id, redis_key, prefix="backup_"):
+    return dict(
+        **create_message(
+            "Please click below to open the website and make changes to the advanced options!",
+            f=Format.INFO
+        ),
+        components=[
+            ActionRow(
+                Button(label="Open Website", style=ButtonStyle.LINK, url=f"https://xenon.bot/forms/{form_id}"),
+                Button(label="I'm Done", style=ButtonStyle.SUCCESS, custom_id=f"{prefix}load_advanced_done", args=[redis_key]),
             )
         ]
     )
@@ -384,6 +401,7 @@ class BackupsModule(Module):
         redis_key = f"backup_load:{unique_id()}"
         await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps({
             "backup_id": backup_id,
+            "form_id": secure_id(),
             "options": list(parsed_options)
         }))
         if edit:
@@ -442,6 +460,54 @@ class BackupsModule(Module):
         await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps(scope))
         await ctx.update(**create_warning_message(scope["options"], redis_key))
 
+    @Module.component(name="backup_load_advanced")
+    async def load_advanced(self, ctx, redis_key):
+        scope = await ctx.bot.redis.get(redis_key)
+        if scope is None:
+            await ctx.update(**create_message(
+                "You were too slow, try again with `/backup load`",
+                f=Format.ERROR
+            ))
+            return
+
+        scope = json.loads(scope)
+        form_id = scope["form_id"]
+
+        meta = await ctx.bot.redis.hget(f"forms:{form_id}", "meta")
+        if meta is None:
+            # TODO: collect meta data for the form
+            meta = {
+                "guild": {
+                    "channels": [],
+                    "roles": []
+                },
+                "backup": {
+                    "channels": [],
+                    "roles": []
+                }
+            }
+
+            await ctx.bot.redis.hset(f"forms:{form_id}", "meta", json.dumps(meta))
+
+        await ctx.bot.redis.expire(f"forms:{form_id}", 60 * 10)
+        await ctx.bot.redis.expire(redis_key, 60 * 11)
+        await ctx.update(**create_advanced_options_message(form_id, redis_key))
+
+    @Module.component(name="backup_load_advanced_done")
+    async def load_advanced_done(self, ctx, redis_key):
+        scope = await ctx.bot.redis.get(redis_key)
+        if scope is None:
+            await ctx.update(**create_message(
+                "You were too slow, try again with `/backup load`",
+                f=Format.ERROR
+            ))
+            return
+
+        scope = json.loads(scope)
+
+        await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps(scope))
+        await ctx.update(**create_warning_message(scope["options"], redis_key))
+
     @Module.component(name="backup_load_cancel")
     async def load_cancel(self, ctx, redis_key):
         await ctx.bot.redis.delete(redis_key)
@@ -462,7 +528,14 @@ class BackupsModule(Module):
             return
 
         scope = json.loads(scope)
-        backup_id, options = scope["backup_id"], scope["options"]
+        backup_id, form_id, options = scope["backup_id"], scope["form_id"], scope["options"]
+
+        # TODO: do something with the advanced settings
+        advanced = await ctx.bot.redis.hget(f"forms:{form_id}", "data")
+        if advanced is not None:
+            advanced = json.loads(advanced)
+        else:
+            advanced = {}
 
         props, data = await self._retrieve_backup(ctx.author.id, backup_id)
         if data is None:
