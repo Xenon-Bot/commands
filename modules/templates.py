@@ -6,6 +6,7 @@ from grpclib.exceptions import GRPCError
 from dbots.protos import backups_pb2
 import grpclib
 import json
+import pymongo
 
 from .audit_logs import AuditLogType
 from .backups import option_status_list, convert_v1_to_v2, channel_tree, parse_options, create_warning_message
@@ -95,8 +96,41 @@ class TemplatesModule(Module):
             ephemeral=True
         )
 
+    async def _template_id_autocomplete(self, ctx, name_or_id):
+        redis_key = f"autocomplete:templates"
+
+        cached = await self.bot.redis.get(redis_key)
+        if cached is not None:
+            templates = json.loads(cached)
+        else:
+            templates = [
+                {"id": template["_id"], "name": template["name"], "description": template["description"]}
+                async for template in self.bot.mongo.dtpl.templates.find(
+                    {},
+                    sort=[("upvote_count", pymongo.DESCENDING), ("usage_count", pymongo.DESCENDING)],
+                    allow_disk_use=True,
+                    projection=("name", "description", "_id")
+                )
+            ]
+            await self.bot.redis.setex(redis_key, 5 * 60, json.dumps(templates))
+
+        identifier = name_or_id.lower().strip()
+        choices = [
+            (f"{template['name']} - {template['description']}"[:50], template["id"])
+            for template in templates
+            if identifier in template["name"].lower() or identifier in template["id"].lower() or
+               identifier in (template.get("description") or "").lower()
+        ]
+        if len(choices) == 0:
+            choices = [(f"Template with the id '{name_or_id}'"[:50], name_or_id)]
+
+        return InteractionResponse.autocomplete(*choices[:20])
+
     @template.sub_command(extends=dict(
-        name_or_id="The name, id or url of the template that you want to load",
+        name_or_id=dict(
+            description="The name, id or url of the template that you want to load",
+            autocomplete=_template_id_autocomplete
+        ),
         options="A list of options"
     ))
     @checks.guild_only
@@ -378,7 +412,10 @@ class TemplatesModule(Module):
         )
 
     @template.sub_command(extends=dict(
-        name_or_id="The name, id or url of the template that you want to load"
+        name_or_id=dict(
+            description="The name, id or url of the template that you want to load",
+            autocomplete=_template_id_autocomplete
+        )
     ))
     @checks.cooldown(2, 10, bucket=checks.CooldownType.AUTHOR)
     async def info(self, ctx, name_or_id: str.strip):
