@@ -199,7 +199,14 @@ def parse_options(default, allowed, option_string):
     return options
 
 
-def create_warning_message(options, redis_key, prefix="backup_"):
+def create_warning_message(options, redis_key, prefix="backup_", advanced_options=True):
+    other_buttons = []
+    if advanced_options:
+        other_buttons.append(
+            Button(label="Advanced Options", style=ButtonStyle.PRIMARY, custom_id=f"{prefix}load_advanced",
+                   args=[redis_key])
+        )
+
     return dict(
         **create_message(
             "**Hey, be careful!** The following actions will be taken on this server and **can not be undone**:\n\n"
@@ -237,8 +244,7 @@ def create_warning_message(options, redis_key, prefix="backup_"):
                 Button(label="Confirm", style=ButtonStyle.SUCCESS, custom_id=f"{prefix}load_confirm",
                        args=[redis_key]),
                 Button(label="Cancel", style=ButtonStyle.DANGER, custom_id=f"{prefix}load_cancel", args=[redis_key]),
-                Button(label="Advanced Options", style=ButtonStyle.PRIMARY, custom_id=f"{prefix}load_advanced",
-                       args=[redis_key])
+                *other_buttons
             )
         ]
     )
