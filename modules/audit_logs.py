@@ -102,8 +102,7 @@ class AuditLogModule(Module):
         ):
             _type = AuditLogType(entry["type"])
             fields.append(dict(
-                name=datetime_to_string(entry["timestamp"]) + " UTC - *" +
-                     _type.name.replace('_', ' ').title() + "*",
+                name=f"<t:{int(entry['timestamp'].timestamp())}> - *{_type.name.replace('_', ' ').title()}*",
                 value=f"{text_formats[_type].format(**entry, **entry['extra'])}"
             ))
 

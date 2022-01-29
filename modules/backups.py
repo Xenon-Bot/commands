@@ -302,7 +302,7 @@ class BackupsModule(Module):
             _backup_id = backup["_id"].upper()
             select_options.append(SelectMenuOption(
                 label=_backup_id,
-                description=f"{backup['data']['name']} ({datetime_to_string(backup['timestamp'])} UTC)"[:50],
+                description=f"{backup['data']['name']} ({datetime_to_string(backup['timestamp'])})"[:50],
                 value=_backup_id
             ))
 
@@ -882,7 +882,7 @@ class BackupsModule(Module):
                 "fields": [
                     {
                         "name": "Created At",
-                        "value": datetime_to_string(props["timestamp"]),
+                        "value": f"<t:{int(props['timestamp'].timestamp())}>",
                         "inline": False
                     },
                     {
@@ -980,7 +980,7 @@ class BackupsModule(Module):
 
             fields.append(dict(
                 name=backup_id + f" • {' '.join(properties)}" * (len(properties) > 0),
-                value=f"{backup['data']['name']} (`{datetime_to_string(backup['timestamp'])} UTC`)"
+                value=f"{backup['data']['name']} (<t:{int(backup['timestamp'].timestamp())}>)"
             ))
 
             select_options.append(SelectMenuOption(
@@ -1238,7 +1238,7 @@ class BackupsModule(Module):
                     projection=("_id", "timestamp", "encrypted")
             ):
                 backup_id = "encrypted" if backup.get("encrypted") else backup["_id"].upper()
-                backups.append(f"**{backup_id}** (`{datetime_to_string(backup['timestamp'])} UTC`)")
+                backups.append(f"**{backup_id}** (<t:{int(backup['timestamp'].timestamp())}>)")
 
             await ctx.respond(embeds=[{
                 "color": Format.INFO.color,
@@ -1252,12 +1252,12 @@ class BackupsModule(Module):
                     },
                     {
                         "name": "Last Backup",
-                        "value": datetime_to_string(interval["last"]) + " UTC",
+                        "value": f"<t:{int(interval['last'].timestamp())}>",
                         "inline": False
                     },
                     {
                         "name": "Next Backup",
-                        "value": datetime_to_string(interval["next"]) + " UTC",
+                        "value": f"<t:{int(interval['next'].timestamp())}>",
                         "inline": False
                     }
                 ]
@@ -1315,10 +1315,10 @@ class BackupsModule(Module):
             "interval": hours
         }}, upsert=True)
 
+        next_backup = now + interval_td
         await ctx.respond(**create_message(
             "Successful **enabled the backup interval**.\nThe first backup will be created in "
-            f"`{timedelta_to_string(interval_td)}` "
-            f"at `{datetime_to_string(now + interval_td)} UTC`.\n\n"
+            f"<t:{int(next_backup.timestamp())}:R>.\n\n"
             f"Type `/backup list` to view your interval backups.",
             f=Format.SUCCESS
         ), ephemeral=True)
