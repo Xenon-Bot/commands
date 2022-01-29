@@ -423,18 +423,25 @@ class BackupsModule(Module):
             backups = json.loads(cached)
         else:
             backups = [
-                {"id": backup["_id"], "name": backup["data"]["name"]}
+                {
+                    "id": backup["_id"],
+                    "name": backup["data"]["name"],
+                    "timestamp": backup["timestamp"].timestamp()
+                }
                 async for backup in self.bot.db.backups.find(
                     {"creator": ctx.author.id},
                     sort=[("timestamp", pymongo.DESCENDING)],
-                    projection=("data.name", "_id")
+                    projection=("data.name", "_id", "timestamp")
                 )
             ]
             await self.bot.redis.setex(redis_key, 60, json.dumps(backups))
 
         backup_id = backup_id.lower().strip()
         choices = [
-            (f"{backup['id'].upper()} | {backup['name']}", backup["id"].upper())
+            (
+                f"{backup['name'][:50]} | {datetime_to_string(datetime.fromtimestamp(backup['timestamp']))} ({backup['id'].upper()})",
+                backup["id"].upper()
+            )
             for backup in backups
             if backup_id in backup["name"].lower() or backup_id in backup["id"].lower()
         ]
