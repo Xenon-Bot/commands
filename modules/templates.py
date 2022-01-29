@@ -164,7 +164,9 @@ class TemplatesModule(Module):
             "options": list(parsed_options)
         }))
 
-        await ctx.respond(**create_warning_message(parsed_options, redis_key, prefix="template_"), ephemeral=True)
+        await ctx.respond(
+            **create_warning_message(parsed_options, redis_key, prefix="template_", advanced_options=False),
+            ephemeral=True)
 
     @Module.component(name="template_load_options")
     async def load_options(self, ctx, redis_key):
@@ -179,7 +181,8 @@ class TemplatesModule(Module):
         scope = json.loads(scope)
         scope["options"] = [o for o in ctx.values if o in ALLOWED_OPTIONS]
         await ctx.bot.redis.setex(redis_key, 60 * 5, json.dumps(scope))
-        await ctx.update(**create_warning_message(scope["options"], redis_key, prefix="template_"))
+        await ctx.update(
+            **create_warning_message(scope["options"], redis_key, prefix="template_", advanced_options=False))
 
     @Module.component(name="template_load_cancel")
     async def load_cancel(self, ctx, redis_key):
