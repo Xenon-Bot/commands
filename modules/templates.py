@@ -1,6 +1,5 @@
 from dbots import *
 from dbots.cmd import *
-import re
 from datetime import timedelta, datetime
 from grpclib.exceptions import GRPCError
 from dbots.protos import backups_pb2
@@ -105,7 +104,7 @@ class TemplatesModule(Module):
         else:
             templates = [
                 {"id": template["_id"], "name": template["name"], "description": template["description"]}
-                async for template in self.bot.mongo.dtpl.templates.find(
+                async for template in self.bot.db.templates.find(
                     {},
                     sort=[("upvote_count", pymongo.DESCENDING), ("usage_count", pymongo.DESCENDING)],
                     allow_disk_use=True,
