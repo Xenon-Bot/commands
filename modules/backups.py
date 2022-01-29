@@ -912,7 +912,7 @@ class BackupsModule(Module):
                 "fields": [
                     {
                         "name": "Created At",
-                        "value": f"<t:{int(props['timestamp'].timestamp())}>",
+                        "value": f"<t:{int(props['timestamp'].timestamp())}:R>",
                         "inline": False
                     },
                     {
@@ -1025,7 +1025,7 @@ class BackupsModule(Module):
 
             fields.append(dict(
                 name=backup_id + f" • {' '.join(properties)}" * (len(properties) > 0),
-                value=f"{backup['data']['name']} (<t:{int(backup['timestamp'].timestamp())}>)"
+                value=f"{backup['data']['name']} (<t:{int(backup['timestamp'].timestamp())}:R>)"
             ))
 
             select_options.append(SelectMenuOption(
@@ -1283,7 +1283,7 @@ class BackupsModule(Module):
                     projection=("_id", "timestamp", "encrypted")
             ):
                 backup_id = "encrypted" if backup.get("encrypted") else backup["_id"].upper()
-                backups.append(f"**{backup_id}** (<t:{int(backup['timestamp'].timestamp())}>)")
+                backups.append(f"**{backup_id}** (<t:{int(backup['timestamp'].timestamp())}:R>)")
 
             await ctx.respond(embeds=[{
                 "color": Format.INFO.color,
@@ -1307,12 +1307,12 @@ class BackupsModule(Module):
                     },
                     {
                         "name": "Last Backup",
-                        "value": f"<t:{int(interval['last'].timestamp())}>",
+                        "value": f"<t:{int(interval['last'].timestamp())}:R>",
                         "inline": False
                     },
                     {
                         "name": "Next Backup",
-                        "value": f"<t:{int(interval['next'].timestamp())}>",
+                        "value": f"<t:{int(interval['next'].timestamp())}:R>",
                         "inline": False
                     }
                 ]
