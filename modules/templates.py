@@ -1,3 +1,4 @@
+from aiohttp import ServerDisconnectedError
 from dbots import *
 from dbots.cmd import *
 from datetime import timedelta, datetime
@@ -74,7 +75,7 @@ class TemplatesModule(Module):
             }
             await self.bot.redis.setex(f"template:{identifier}", 60 * 3, json.dumps(parsed))
             return parsed
-        except rest.HTTPNotFound:
+        except (rest.HTTPNotFound, ServerDisconnectedError):
             return None
 
     @Module.command()
