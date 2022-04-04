@@ -1,5 +1,4 @@
-from dbots.cmd import *
-import asyncio
+from lib.discord import *
 
 FAQ = {
     "How do I invite Xenon to my server?":

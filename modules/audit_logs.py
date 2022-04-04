@@ -1,7 +1,6 @@
 from enum import IntEnum
 import pymongo
-from dbots.cmd import *
-from dbots import *
+from lib.discord import *
 from datetime import datetime, timedelta
 
 
@@ -147,8 +146,6 @@ class AuditLogModule(Module):
         page="The page to display (default 1)"
     ))
     @checks.guild_only
-    @checks.has_permissions_level()
-    @checks.cooldown(2, 10, bucket=checks.CooldownType.GUILD)
     async def logs(self, ctx, page: int = 1):
         """
         Get a list of actions that were recently taken on this server

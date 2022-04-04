@@ -1,12 +1,4 @@
-from dbots.cmd import *
-
-PERMISSION_DESCRIPTIONS = {
-    checks.PermissionLevels.ADMIN_ONLY: "Server admins can create backups, enable the backup interval and "
-                                        "load a template or backup",
-    checks.PermissionLevels.DESTRUCTIVE_OWNER: "Server admins can create backups and enable the backup interval "
-                                               "but only the server owner can load backups or templates",
-    checks.PermissionLevels.OWNER_ONLY: "Only the server owner can use any of the relevant commands"
-}
+from lib.discord import *
 
 
 class SettingsModule(Module):
@@ -18,32 +10,13 @@ class SettingsModule(Module):
 
     @settings.sub_command()
     @guild_only
-    @has_permissions(administrator=True)
-    @cooldown(2, 10, bucket=checks.CooldownType.GUILD)
     async def show(self, ctx):
         """
         Show the current settings for this server
         """
-        settings = await ctx.bot.db.guilds.find_one({"_id": ctx.guild_id}) or {}
-        permissions_level = PermissionLevels(
-            settings.get("permissions_level", PermissionLevels.DESTRUCTIVE_OWNER.value)
-        )
-
-        await ctx.respond(embeds=[{
-            "title": "Server Settings",
-            "color": Format.INFO.color,
-            "fields": [
-                {
-                    "name": f"Permissions Level: *{permissions_level.name.replace('_', ' ').title()}*",
-                    "value": PERMISSION_DESCRIPTIONS[permissions_level]
-                }
-            ]
-        }], ephemeral=True)
 
     @settings.sub_command()
     @guild_only
-    @checks.is_guild_owner
-    @checks.cooldown(1, 10, bucket=checks.CooldownType.GUILD)
     async def reset(self, ctx):
         """
         Reset the settings for this server to the default values
@@ -78,8 +51,6 @@ class SettingsModule(Module):
                          f"```/settings permissions owner```"
     )
     @guild_only
-    @checks.is_guild_owner
-    @checks.cooldown(1, 10, bucket=checks.CooldownType.GUILD)
     async def permissions(self, ctx, level):
         """
         Set the permissions mode for this server

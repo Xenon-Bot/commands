@@ -1,5 +1,4 @@
-from dbots.cmd import *
-from dbots import rest, ChannelType
+from lib.discord import *
 from io import StringIO
 import json
 import csv
@@ -53,8 +52,6 @@ class ExportModule(Module):
     @export.sub_command(extends=dict(
         format=FORMAT_ARG_EXTENDS
     ))
-    @has_permissions_level()
-    @checks.cooldown(1, 15, bucket=checks.CooldownType.AUTHOR)
     async def channels(self, ctx, format):
         """
         Export all channels as JSON or CSV
@@ -64,7 +61,7 @@ class ExportModule(Module):
         data = [c.to_dict() for c in channels]
 
         file_name = f"channels_{ctx.guild_id}"
-        await ctx.respond(files=[rest.File(
+        await ctx.respond(files=[File(
             _data_to_fp(data, _format=format),
             filename=f"{file_name}.{format}"
         )], ephemeral=True)
@@ -72,8 +69,6 @@ class ExportModule(Module):
     @export.sub_command(extends=dict(
         channel="The channel that you want to export"
     ))
-    @has_permissions_level()
-    @checks.cooldown(3, 15, bucket=checks.CooldownType.AUTHOR)
     async def channel(self, ctx, channel: CommandOptionType.CHANNEL):
         """
         Export a channel or category as JSON or CSV
@@ -89,7 +84,7 @@ class ExportModule(Module):
             ]
 
         file_name = f"{channel.name.replace(' ', '_').lower()}_{channel.id}"
-        await ctx.respond(files=[rest.File(
+        await ctx.respond(files=[File(
             _data_to_fp(data, _format="json"),
             filename=f"{file_name}.json"
         )], ephemeral=True)
@@ -97,8 +92,6 @@ class ExportModule(Module):
     @export.sub_command(extends=dict(
         format=FORMAT_ARG_EXTENDS
     ))
-    @has_permissions_level()
-    @checks.cooldown(1, 15, bucket=checks.CooldownType.AUTHOR)
     async def roles(self, ctx, format):
         """
         Export all roles as JSON or CSV
@@ -116,8 +109,6 @@ class ExportModule(Module):
     @export.sub_command(extends=dict(
         role="The role that you want to export"
     ))
-    @has_permissions_level()
-    @checks.cooldown(5, 15, bucket=checks.CooldownType.AUTHOR)
     async def role(self, ctx, role: CommandOptionType.ROLE):
         """
         Export a role as JSON
@@ -134,9 +125,6 @@ class ExportModule(Module):
     @export.sub_command(extends=dict(
         format=FORMAT_ARG_EXTENDS
     ))
-    @has_permissions_level()
-    @bot_has_permissions(ban_members=True)
-    @checks.cooldown(1, 30, bucket=checks.CooldownType.AUTHOR)
     async def bans(self, ctx, format):
         """
         Export all bans as JSON or CSV
@@ -147,9 +135,6 @@ class ExportModule(Module):
     @export.sub_command(extends=dict(
         message="The id or url of the message that you want to export"
     ))
-    @has_permissions(manage_messages=True)
-    @bot_has_permissions(read_message_history=True)
-    @checks.cooldown(3, 15, bucket=checks.CooldownType.AUTHOR)
     async def message(self, ctx, message):
         """
         Export a message as JSON
@@ -161,9 +146,6 @@ class ExportModule(Module):
         message="The id or url of the message that you want to export",
         format=FORMAT_ARG_EXTENDS
     ))
-    @has_permissions(manage_messages=True)
-    @bot_has_permissions(read_message_history=True, manage_messages=True)
-    @checks.cooldown(1, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
     async def reactions(self, ctx, message, format):
         """
         Export the reactions from a message as JSON or CSV

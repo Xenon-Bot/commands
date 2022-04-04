@@ -1,6 +1,5 @@
 from aiohttp import ServerDisconnectedError
-from dbots import *
-from dbots.cmd import *
+from lib.discord import *
 from datetime import timedelta, datetime
 from grpclib.exceptions import GRPCError
 from dbots.protos import backups_pb2
@@ -9,7 +8,7 @@ import json
 import pymongo
 
 from .audit_logs import AuditLogType
-from .backups import option_status_list, convert_v1_to_v2, channel_tree, parse_options, create_warning_message
+from .backups import option_status_list, channel_tree, parse_options, create_warning_message
 
 ALLOWED_OPTIONS = ("delete_roles", "delete_channels", "roles", "channels", "settings")
 
@@ -331,8 +330,6 @@ class TemplatesModule(Module):
 
     @template.sub_command()
     @checks.guild_only
-    @checks.has_permissions_level(destructive=True)
-    @checks.cooldown(2, 30, bucket=checks.CooldownType.GUILD)
     async def cancel(self, ctx):
         """
         Cancel the currently running loading process on this server

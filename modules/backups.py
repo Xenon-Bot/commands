@@ -1,6 +1,4 @@
-import asyncio
-from dbots import *
-from dbots.cmd import *
+from lib.discord import *
 import pymongo
 import pymongo.errors
 from datetime import datetime, timedelta
@@ -9,7 +7,6 @@ from grpclib.exceptions import GRPCError
 import grpclib
 import brotli
 import gridfs
-from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 import ecies
 import base64
 import hashlib
@@ -18,7 +15,6 @@ import json
 from copy import deepcopy
 
 from .audit_logs import AuditLogType
-from . import encryption
 from . import premium
 
 MAX_BACKUPS = 15
@@ -103,81 +99,6 @@ def option_status_list(options):
             result.append(f"- {text}")
 
     return "\n".join(result)
-
-
-def convert_v1_to_v2(data):
-    channels = []
-    for channel in data["channels"]:
-        channels.append(
-            backups_pb2.BackupData.Channel(
-                id=channel["id"],
-                type=channel["type"],
-                name=channel["name"],
-                position=channel["position"],
-                overwrites=[
-                    backups_pb2.BackupData.Channel.Overwrite(
-                        id=ov["id"],
-                        type=ov["type"] if isinstance(ov["type"], int) else int(ov["type"] != "role"),
-                        allow=str(ov["allow"]),
-                        deny=str(ov["deny"])
-                    )
-                    for ov in channel["permission_overwrites"]
-                ],
-                parent_id=channel.get("parent_id"),
-
-                topic=channel.get("topic"),
-                nsfw=channel.get("nsfw"),
-                rate_limit_per_user=channel.get("rate_limit_per_user"),
-
-                bitrate=channel.get("bitrate"),
-                user_limit=channel.get("user_limit")
-            )
-        )
-
-    return backups_pb2.BackupData(
-        id=data["id"],
-        name=data["name"],
-        icon=data.get("icon"),
-        region=data.get("region"),
-        afk_channel_id=data.get("afk_channel_id"),
-        afk_timeout=data.get("afk_timeout"),
-        verification_level=data.get("verification_level"),
-        default_message_notifications=data.get("default_message_notifications"),
-        explicit_content_filter=data.get("explicit_content_filter"),
-
-        rules_channel_id=data.get("rules_channel_id"),
-        public_updates_channel_id=data.get("public_updates_channel_id"),
-        preferred_locale=data.get("preferred_locale"),
-
-        channels=channels,
-        roles=[
-            backups_pb2.BackupData.Role(
-                id=role["id"],
-                name=role["name"],
-                permissions=str(role["permissions"]),
-                position=role["position"],
-                hoist=role.get("hoist"),
-                managed=role.get("managed"),
-                mentionable=role.get("mentionable"),
-                color=role.get("color")
-            )
-            for role in data.get("roles", [])
-        ],
-        bans=[
-            backups_pb2.BackupData.Ban(
-                id=ban["id"],
-                reason=ban.get("reason")
-            )
-            for ban in data.get("bans", [])
-        ],
-        members={
-            member["id"]: backups_pb2.BackupData.Member(
-                nick=member["nick"],
-                roles=member["roles"]
-            )
-            for member in data.get("members", [])
-        }
-    )
 
 
 def parse_options(default, allowed, option_string):
@@ -274,18 +195,6 @@ def create_advanced_options_message(form_id, redis_key, prefix="backup_"):
 class BackupsModule(Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.grid_fs = AsyncIOMotorGridFSBucket(self.bot.db, "backup_chunks", chunk_size_bytes=8000000)
-
-    async def post_setup(self):
-        await self.bot.db.backups.create_index([("creator", pymongo.ASCENDING)])
-        await self.bot.db.backups.create_index([("timestamp", pymongo.ASCENDING)])
-        await self.bot.db.backups.create_index([("data.id", pymongo.ASCENDING)])
-        await self.bot.db.intervals.create_index([("guild", pymongo.ASCENDING), ("user", pymongo.ASCENDING)])
-        await self.bot.db.intervals.create_index([("next", pymongo.ASCENDING)])
-        await self.bot.db.id_translators.create_index(
-            [("source_id", pymongo.ASCENDING), ("target_id", pymongo.ASCENDING)],
-            unique=True
-        )
 
     async def _unknown_backup_message(self, user_id, backup_id):
         data = deepcopy(create_message(
@@ -334,8 +243,6 @@ class BackupsModule(Module):
 
     @backup.sub_command()
     @checks.guild_only
-    @checks.has_permissions_level()
-    @checks.cooldown(1, 30, bucket=checks.CooldownType.GUILD, manual=True)
     async def create(self, ctx):
         """
         Create a backup of this server
@@ -461,10 +368,6 @@ class BackupsModule(Module):
         options="A list of options"
     ))
     @checks.guild_only
-    @checks.has_permissions_level(destructive=True)
-    @checks.bot_has_permissions("administrator")
-    @checks.not_in_maintenance
-    @checks.cooldown(1, 5 * 60, bucket=checks.CooldownType.GUILD, manual=True)
     async def load(self, ctx, backup_id: str.strip, options: str.lower = ""):
         """
         Load a previously created backup on this server
@@ -474,9 +377,6 @@ class BackupsModule(Module):
         return await self._backup_load(ctx, backup_id, options)
 
     @Module.component(name="backup_load_direct")
-    @checks.has_permissions_level(destructive=True)
-    @checks.bot_has_permissions("administrator")
-    @checks.not_in_maintenance
     async def load_direct(self, ctx, backup_id):
         return await self._backup_load(ctx, backup_id, "", edit=True)
 
@@ -640,7 +540,7 @@ class BackupsModule(Module):
             ))
             return
 
-        role_route = rest.Route("POST", "/guilds/{guild_id}/roles", guild_id=ctx.guild_id)
+        role_route = Route("POST", "/guilds/{guild_id}/roles", guild_id=ctx.guild_id)
         rl = await ctx.bot.http.get_bucket(role_route.bucket)
         if rl is not None and rl.remaining < len(data.roles) and "roles" in options:
             await ctx.update(**create_message(
@@ -732,7 +632,7 @@ class BackupsModule(Module):
                 f"Successfully **loaded the backup**.",
                 f=Format.SUCCESS
             ))
-        except rest.HTTPException:
+        except HTTPException:
             pass
 
         # Save ids for later use and recovery
@@ -785,8 +685,6 @@ class BackupsModule(Module):
 
     @backup.sub_command()
     @checks.guild_only
-    @checks.has_permissions_level()
-    @checks.cooldown(2, 10, bucket=checks.CooldownType.GUILD)
     async def status(self, ctx):
         """
         Get the status of the currently running loading process
@@ -922,7 +820,6 @@ class BackupsModule(Module):
             autocomplete=_backup_id_autocomplete
         )
     ))
-    @checks.cooldown(5, 30, bucket=checks.CooldownType.AUTHOR)
     async def info(self, ctx, backup_id: str.strip):
         """
         Get information about a previously created backup
@@ -1033,7 +930,6 @@ class BackupsModule(Module):
         page="The page to display (default 1)",
         master_kay="The master key (only for encrypted backups)"
     ))
-    @checks.cooldown(2, 10, bucket=checks.CooldownType.AUTHOR)
     async def list(self, ctx, page: int = 1, master_key=None):
         """
         Get a list of all your previously created backups
@@ -1052,7 +948,6 @@ class BackupsModule(Module):
             autocomplete=_backup_id_autocomplete
         )
     ))
-    @checks.cooldown(5, 30, bucket=checks.CooldownType.AUTHOR)
     async def delete(self, ctx, backup_id: str.strip):
         """
         Delete a previously created backup >THIS CAN NOT BE UNDONE<
@@ -1219,8 +1114,6 @@ class BackupsModule(Module):
 
     @interval.sub_command()
     @checks.guild_only
-    @checks.has_permissions_level()
-    @checks.cooldown(2, 10, bucket=checks.CooldownType.AUTHOR)
     async def show(self, ctx):
         """
         Show your current backup interval for this server
@@ -1288,8 +1181,6 @@ class BackupsModule(Module):
         )
     )
     @checks.guild_only
-    @checks.has_permissions_level()
-    @checks.cooldown(1, 10, bucket=checks.CooldownType.AUTHOR)
     async def on(self, ctx, interval):
         """
         Enable your backup interval for this server
@@ -1340,8 +1231,6 @@ class BackupsModule(Module):
 
     @interval.sub_command()
     @checks.guild_only
-    @checks.has_permissions_level()
-    @checks.cooldown(1, 10, bucket=checks.CooldownType.AUTHOR)
     async def off(self, ctx):
         """
         Disable your backup interval for this server
@@ -1475,57 +1364,3 @@ class BackupsModule(Module):
             await self._delete_backup(backup["creator"], backup["_id"])
 
         return result.deleted_count + count
-
-    async def _run_interval(self, semaphore, interval):
-        try:
-            _next = interval["next"]
-            try:
-                while _next < datetime.utcnow():
-                    _next += timedelta(hours=max(interval["interval"], 1))
-            except OverflowError:
-                # interval length goes brrr
-                await self.bot.db.intervals.delete_one({"_id": interval["_id"]})
-
-            await self.bot.db.intervals.update_one({"_id": interval["_id"]}, {"$set": {
-                "next": _next,
-                "last": datetime.utcnow()
-            }})
-
-            try:
-                replies = await self.bot.rpc.backups.Create(backups_pb2.CreateRequest(
-                    guild_id=interval["guild"],
-                    options=["roles", "channels", "settings"],
-                    message_count=0
-                ))
-            except GRPCError as e:
-                if e.status == grpclib.Status.NOT_FOUND:
-                    await self.bot.db.intervals.delete_many({"guild": interval["guild"]})
-                    return
-                else:
-                    raise
-
-            data = replies[-1].data
-            if data is None:
-                return
-
-            await self.bot.db.backups.delete_many({
-                "data.id": interval["guild"],
-                "creator": interval["user"],
-                "interval": True,
-            })
-
-            await self._store_backup(interval["user"], data, interval=True)
-        finally:
-            semaphore.release()
-
-    @Module.task(minutes=5)
-    async def interval_task(self):
-        tasks = []
-        semaphore = asyncio.Semaphore(5)
-        to_backup = self.bot.db.intervals.find({"next": {"$lt": datetime.utcnow()}})
-        async for interval in to_backup:
-            await semaphore.acquire()
-            tasks.append(self.bot.loop.create_task(self._run_interval(semaphore, interval)))
-
-        if len(tasks) != 0:
-            await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)

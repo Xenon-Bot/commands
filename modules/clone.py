@@ -1,5 +1,4 @@
-from dbots.cmd import *
-from dbots import *
+from lib.discord import *
 import traceback
 
 
@@ -17,10 +16,6 @@ class CloneModule(Module):
         )
     )
     @guild_only
-    @checks.has_permissions_level(destructive=True)
-    @checks.bot_has_permissions("manage_channels")
-    @checks.not_in_maintenance
-    @checks.cooldown(2, 30, bucket=checks.CooldownType.GUILD, manual=True)
     async def channel(self, ctx, channel: CommandOptionType.CHANNEL, child_channels: bool = False):
         """
         Create a clone of channel including permission overwrites
@@ -55,7 +50,7 @@ class CloneModule(Module):
                 data = child.to_dict()
                 data["parent_id"] = new_channel.id
                 await ctx.bot.http.create_guild_channel(ctx.guild_id, **data)
-            except rest.HTTPException:
+            except HTTPException:
                 traceback.print_exc()
                 continue
 
@@ -85,10 +80,6 @@ class CloneModule(Module):
         )
     )
     @guild_only
-    @checks.has_permissions_level(destructive=True)
-    @checks.bot_has_permissions("manage_channels", "manage_roles")
-    @checks.not_in_maintenance
-    @checks.cooldown(3, 60, bucket=checks.CooldownType.GUILD, manual=True)
     async def role(self, ctx, role: CommandOptionType.ROLE, apply_overwrites: bool = False):
         """
         Create a clone of a role optionally including channel permission overwrites

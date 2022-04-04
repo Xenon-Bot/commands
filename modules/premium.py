@@ -1,4 +1,4 @@
-from dbots.cmd import *
+from lib.discord import *
 
 PREMIUM_ONLY_TEXT = "This command can **only** be used with **Xenon Premium**.\n\n" \
                     "**Xenon Premium** is the **paid version** of Xenon.\n" \
