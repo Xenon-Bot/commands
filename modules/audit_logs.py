@@ -61,14 +61,6 @@ class AuditLogModule(Module):
         await self.bot.db.audit_logs.create_index([("user", pymongo.ASCENDING)])
         await self.bot.db.audit_logs.create_index([("guilds", pymongo.ASCENDING)])
 
-    @Module.task(hours=1)
-    async def audit_log_retention(self):
-        await self.bot.db.audit_logs.delete_many({
-            "timestamp": {
-                "$lte": datetime.utcnow() - timedelta(days=365)
-            }
-        })
-
     @Module.command()
     async def audit(self, ctx):
         """

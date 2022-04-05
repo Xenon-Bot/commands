@@ -2,8 +2,6 @@ from enum import IntEnum
 from uuid import uuid4
 import types
 
-from .checks import *
-
 
 __all__ = (
     "ComponentType",
@@ -28,15 +26,9 @@ class ComponentType(IntEnum):
 
 
 def make_component(cb, **kwargs):
-    checks = []
-    while isinstance(cb, Check):
-        checks.append(cb)
-        cb = cb.next
-
     values = {
         "callable": cb,
-        "name": cb.__name__,
-        "checks": checks
+        "name": cb.__name__
     }
 
     values.update(kwargs)
@@ -176,7 +168,6 @@ class PartialComponent:
     def __init__(self, **kwargs):
         self.name = kwargs["name"]
         self.callable = kwargs["callable"]
-        self.checks = kwargs.get("checks", [])
 
     def bind(self, obj):
         self.callable = types.MethodType(self.callable, obj)

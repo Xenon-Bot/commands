@@ -1,6 +1,8 @@
 __all__ = (
     "CoreError",
-    "make_core_error"
+    "make_core_error",
+    "NotFoundError",
+    "RateLimitError"
 )
 
 

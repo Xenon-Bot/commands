@@ -4,7 +4,6 @@ import re
 import types
 
 from .errors import *
-from .checks import *
 
 __all__ = (
     "make_command",
@@ -72,12 +71,6 @@ def inspect_options(_callable, extends=None):
 
 
 def make_command(klass, cb, **kwargs):
-    checks = []
-    while isinstance(cb, Check):
-        checks.append(cb)
-
-        cb = cb.next
-
     doc = inspect.getdoc(cb)
     description = None
     long_description = None
@@ -93,7 +86,6 @@ def make_command(klass, cb, **kwargs):
         "description": description,
         "long_description": long_description,
         "options": inspect_options(cb, extends=kwargs.get("extends")),
-        "checks": checks
     }
 
     values.update(kwargs)
@@ -120,7 +112,6 @@ class Command:
         self.sub_commands = []
 
         self.default_permissions = kwargs.get("default_permissions", True)
-        self.checks = kwargs.get("checks", [])
         self.guild_id = kwargs.get("guild_id")
         self.register = kwargs.get("register", True)
         self.ephemeral = kwargs.get("ephemeral", True)
@@ -219,7 +210,6 @@ class SubCommand:
         self.options = kwargs.get("options", [])
 
         self.parent = kwargs.get("parent")
-        self.checks = kwargs.get("checks", [])
         self.ephemeral = kwargs.get("ephemeral", True)
 
     @property
@@ -250,7 +240,6 @@ class SubCommandGroup:
         self.sub_commands = []
 
         self.parent = kwargs.get("parent")
-        self.checks = kwargs.get("checks", [])
         self.ephemeral = kwargs.get("ephemeral", True)
 
     @property

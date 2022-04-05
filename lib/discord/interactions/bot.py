@@ -16,7 +16,9 @@ from .modal import *
 from .payloads import *
 from .response import *
 from ..http import *
+from .state import *
 from ..utils import *
+from ...core import CoreClient
 
 __all__ = (
     "InteractionBot",
@@ -36,8 +38,10 @@ class InteractionBot:
         # Filled by setup()
         self.session = None
         self.http = None
+        self.core = None
 
         self.modules = set()
+        self.state = StateStore()
 
     @property
     def loop(self):
@@ -118,7 +122,7 @@ class InteractionBot:
         tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
         print("Command Error:\n", tb, file=sys.stderr)
 
-    async def _execute_command(self, command, payload, remaining_options):
+    def _execute_command(self, command, payload, remaining_options):
         ctx = CommandContext(self, command, payload, args=remaining_options)
 
         try:
@@ -129,21 +133,13 @@ class InteractionBot:
                     value = matching_option.converter(option.value)
                     values[option.name] = value
 
-            for check in command.checks:
-                res = await check.run(ctx, **values)
-                if res is not None:
-                    yield res
-
             result = command.callable(ctx, **values)
-            if inspect.isawaitable(result):
-                yield await result
-            elif inspect.isasyncgen(result):
-                async for resp in result:
-                    yield resp
+            if inspect.isasyncgen(result):
+                return result
             else:
-                yield result
+                return result
         except Exception as e:
-            yield await self.on_context_error(ctx, e)
+            return single_async_yield(self.on_context_error(ctx, e))
 
     async def _execute_command_autocomplete(self, command, payload, remaining_options):
         ctx = CommandAutocompleteContext(self, command, payload, args=remaining_options)
@@ -163,45 +159,29 @@ class InteractionBot:
 
         yield InteractionResponse.autocomplete()
 
-    async def _execute_component(self, component, payload, args):
+    def _execute_component(self, component, payload, args):
         ctx = ComponentContext(self, component, payload)
 
         try:
-            for check in component.checks:
-                res = await check.run(ctx)
-                if res is not True:
-                    return
-
             result = component.callable(ctx, *args)
-            if inspect.isawaitable(result):
-                yield await result
-            elif inspect.isasyncgen(result):
-                async for resp in result:
-                    yield resp
+            if inspect.isasyncgen(result):
+                return result
             else:
-                yield result
+                return single_async_yield(result)
         except Exception as e:
-            yield await self.on_context_error(ctx, e)
+            return single_async_yield(self.on_context_error(ctx, e))
 
     async def _execute_modal(self, modal, payload):
         ctx = ModalContext(self, modal, payload)
 
         try:
-            for check in modal.checks:
-                res = await check.run(ctx)
-                if res is not True:
-                    return
-
             result = modal.callable(ctx)
-            if inspect.isawaitable(result):
-                yield await result
-            elif inspect.isasyncgen(result):
-                async for resp in result:
-                    yield resp
+            if inspect.isasyncgen(result):
+                return result
             else:
-                yield result
+                return single_async_yield(result)
         except Exception as e:
-            yield await self.on_context_error(ctx, e)
+            return single_async_yield(self.on_context_error(ctx, e))
 
     async def _drive_executor(self, payload, executor):
         initial_response = self.loop.create_future()
@@ -372,7 +352,9 @@ class InteractionBot:
             application_id=self.application_id,
             session=self.session
         )
+        self.core = CoreClient(self.session, "http://127.0.0.1:8080/main", "1234567890")
 
+        self.loop.create_task(self.state.expire_task())
         for module in self.modules:
             self.loop.create_task(module.post_setup())
 

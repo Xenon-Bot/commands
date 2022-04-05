@@ -1,3 +1,4 @@
+import inspect
 import random
 from datetime import datetime, timedelta
 import zlib
@@ -15,7 +16,8 @@ __all__ = (
     "timedelta_to_string",
     "string_to_timedelta",
     "time_units",
-    "secure_id"
+    "secure_id",
+    "single_async_yield"
 )
 
 
@@ -167,3 +169,10 @@ def string_to_timedelta(string):
                 i += 1
 
     return timedelta(seconds=seconds)
+
+
+async def single_async_yield(item):
+    if inspect.isawaitable(item):
+        yield await item
+    else:
+        yield item

@@ -1,50 +1,47 @@
-import inspect
+import functools
 
 from .formatter import *
 from .response import *
+from ..utils import *
 
 __all__ = (
-    "Check",
     "guild_only",
     "dm_only",
 )
 
 
-class Check:
-    def __init__(self, callable, next=None):
-        self.callable = callable
-        self.next = next
+def check(check_func):
+    def _predicate(handler):
+        @functools.wraps(handler)
+        def _wrapped_handler(*args, **kwargs):
+            res = check_func(*args[1:], **kwargs)
+            if isinstance(res, InteractionResponse):
+                return single_async_yield(res)
 
-    def __call__(self, next):
-        self.next = next
-        return self
+            return handler(*args, **kwargs)
 
-    async def run(self, ctx, **kwargs):
-        result = self.callable(ctx, **kwargs)
-        if inspect.isawaitable(result):
-            result = await result
+        return _wrapped_handler
 
-        return result
+    return _predicate
 
 
-@Check
-async def guild_only(ctx, **_):
+@check
+def guild_only(ctx, **_):
     if ctx.guild_id is None:
-        return InteractionResponse.message(**create_message(
+        return create_response(
             "This command can **only** be used **inside a server**.",
             f=Format.ERROR
-        ), ephemeral=True)
+        )
 
     return None
 
 
-@Check
-async def dm_only(ctx, **_):
+@check
+def dm_only(ctx, **_):
     if ctx.guild_id is not None:
-        await ctx.respond(**create_message(
+        return create_response(
             "This command can **only** be used inside **direct messages**.",
             f=Format.ERROR
-        ), ephemeral=True)
-        return False
+        )
 
-    return True
+    return None
