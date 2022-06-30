@@ -199,7 +199,7 @@ def parse_options(default, allowed, option_string):
     return options
 
 
-def create_warning_message(options, redis_key, prefix="backup_", advanced_options=True):
+def create_warning_message(options, redis_key, prefix="backup_", advanced_options=False):
     other_buttons = []
     if advanced_options:
         other_buttons.append(

@@ -129,7 +129,7 @@ class TemplatesModule(Module):
     @template.sub_command(extends=dict(
         name_or_id=dict(
             description="The name, id or url of the template that you want to load",
-            autocomplete=_template_id_autocomplete
+            # autocomplete=_template_id_autocomplete
         ),
         options="A list of options"
     ))
@@ -417,7 +417,7 @@ class TemplatesModule(Module):
     @template.sub_command(extends=dict(
         name_or_id=dict(
             description="The name, id or url of the template that you want to load",
-            autocomplete=_template_id_autocomplete
+            # autocomplete=_template_id_autocomplete
         )
     ))
     @checks.cooldown(2, 10, bucket=checks.CooldownType.AUTHOR)
