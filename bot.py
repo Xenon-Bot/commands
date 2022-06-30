@@ -9,8 +9,6 @@ import sys
 from datetime import datetime
 import grpclib.client
 from dbots.protos import backups_grpc
-import sentry_sdk
-import functools
 
 
 class RpcCollection:
@@ -21,14 +19,17 @@ class RpcCollection:
 class Xenon(InteractionBot):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.mongo = AsyncIOMotorClient(env.get("MONGO_URL", "mongodb://localhost"))
-        self.db = self.mongo.xenon
+        self.mongo = None
         self._invite = None
         self._support_invite = None
 
-        self.rpc = RpcCollection(env.get("BACKUPS_SERVICE", "127.0.0.1:8081"))
+        self.rpc = None
 
         self.component(self._delete_button, name="delete")
+
+    @property
+    def db(self):
+        return self.mongo.xenon
 
     async def _delete_button(self, ctx):
         ctx.defer()
@@ -39,20 +40,6 @@ class Xenon(InteractionBot):
             raise e
 
         else:
-            if not isinstance(e, rest.HTTPException):
-                with sentry_sdk.push_scope() as scope:
-                    if isinstance(ctx, CommandContext):
-                        scope.set_tag("command", ctx.command.full_name)
-                        scope.set_tag("args", ", ".join([f"{arg.name}: {arg.value}" for arg in ctx.args]))
-
-                    scope.set_tag("guild_id", ctx.guild_id)
-                    scope.set_user({
-                        "id": ctx.author.id,
-                        "name": ctx.author.name,
-                        "discriminator": ctx.author.discriminator}
-                    )
-                    sentry_sdk.capture_exception(e)
-
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             print("Command Error:\n", tb, file=sys.stderr)
 
@@ -137,3 +124,8 @@ class Xenon(InteractionBot):
 
         self._support_invite = invite
         return invite
+
+    async def setup(self, redis_url="redis://localhost"):
+        self.rpc = RpcCollection(env.get("BACKUPS_SERVICE", "127.0.0.1:8081"))
+        self.mongo = AsyncIOMotorClient(env.get("MONGO_URL", "mongodb://localhost"))
+        await super().setup(redis_url)

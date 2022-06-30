@@ -2,17 +2,10 @@ import asyncio
 from os import environ as env
 from aiohttp import web
 from concurrent.futures import ThreadPoolExecutor
-import sentry_sdk
 from dbots.cmd import *
 
 from bot import Xenon
 from modules import backups, basics, settings, audit_logs, templates, premium, admin, clone, encryption, export
-
-if env.get("SENTRY"):
-    sentry_sdk.init(
-        env["SENTRY"],
-        traces_sample_rate=0.1
-    )
 
 Format.ERROR.components = [ActionRow(
     Button(label="Wiki", url="https://wiki.xenon.bot", emoji="📚"),
