@@ -232,7 +232,7 @@ def parse_options(default, allowed, option_string):
     return options
 
 
-def create_warning_message(options, redis_key, prefix="backup_", advanced_options=True):
+def create_warning_message(options, redis_key, prefix="backup_", advanced_options=False):
     other_buttons = []
     if advanced_options:
         other_buttons.append(
@@ -297,9 +297,10 @@ def create_advanced_options_message(form_id, redis_key, prefix="backup_"):
 class BackupsModule(Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.grid_fs = AsyncIOMotorGridFSBucket(self.bot.db, "backup_chunks", chunk_size_bytes=8000000)
+        self.grid_fs = None
 
     async def post_setup(self):
+        self.grid_fs = AsyncIOMotorGridFSBucket(self.bot.db, "backup_chunks", chunk_size_bytes=8000000)
         await self.bot.db.backups.create_index([("creator", pymongo.ASCENDING)])
         await self.bot.db.backups.create_index([("timestamp", pymongo.ASCENDING)])
         await self.bot.db.backups.create_index([("data.id", pymongo.ASCENDING)])
