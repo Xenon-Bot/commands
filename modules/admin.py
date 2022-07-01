@@ -8,7 +8,7 @@ from datetime import datetime
 
 
 class AdminModule(Module):
-    @Module.command(default_permissions=False)
+    @Module.command(default_member_permissions=0)
     @checks.is_bot_owner
     async def maintenance(self, ctx):
         """
@@ -29,7 +29,7 @@ class AdminModule(Module):
                 f=Format.SUCCESS
             ), ephemeral=True)
 
-    @Module.command(default_permissions=False)
+    @Module.command(default_member_permissions=0)
     @checks.is_bot_owner
     async def eval(self, ctx, expression):
         """
@@ -58,7 +58,7 @@ class AdminModule(Module):
                 f=Format.SUCCESS
             ), ephemeral=True)
 
-    @Module.command(default_permissions=False)
+    @Module.command(default_member_permissions=0)
     @checks.is_bot_owner
     async def exec(self, ctx, snippet):
         """
@@ -97,7 +97,7 @@ class AdminModule(Module):
                 f=Format.SUCCESS
             ), ephemeral=True)
 
-    @Module.command(default_permissions=False)
+    @Module.command(default_member_permissions=0)
     @checks.is_bot_owner
     async def redis(self, ctx, cmd):
         """
@@ -110,7 +110,7 @@ class AdminModule(Module):
             f=Format.SUCCESS
         ), ephemeral=True)
 
-    @Module.command(default_permissions=False)
+    @Module.command(default_member_permissions=0)
     @checks.is_bot_owner
     async def error(self, ctx, error_id: str.lower = None, delete: bool = False):
         """
@@ -197,7 +197,7 @@ class AdminModule(Module):
         if delete:
             await ctx.bot.redis.delete(f"cmd:errors:{error_id}")
 
-    @Module.command(default_permissions=False)
+    @Module.command(default_member_permissions=0)
     @checks.is_bot_owner
     async def blacklist(self, ctx):
         """
