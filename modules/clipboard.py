@@ -13,7 +13,7 @@ from .audit_logs import AuditLogType
 
 
 class ClipboardModule(Module):
-    @Module.command()
+    @Module.command(default_member_permissions=Permissions.FlagList.administrator, dm_permission=False)
     async def clipboard(self, ctx):
         """
         Save, load and manage your clipboard (similar to ctrl+c & ctrl+v)
@@ -22,7 +22,6 @@ class ClipboardModule(Module):
     @clipboard.sub_command(extends=dict(
         message_count="The count of messages to save per channel"
     ))
-    @checks.guild_only
     @checks.has_permissions_level()
     @checks.bot_has_permissions("administrator")
     @checks.cooldown(1, 30, bucket=checks.CooldownType.GUILD)
@@ -69,7 +68,6 @@ class ClipboardModule(Module):
         message_count="The count of messages to load per channel",
         options="A list of options"
     ))
-    @checks.guild_only
     @checks.has_permissions_level(destructive=True)
     @checks.bot_has_permissions("administrator")
     @checks.not_in_maintenance

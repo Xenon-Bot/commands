@@ -5,7 +5,6 @@ import binascii
 import pymongo
 import ecies
 from datetime import datetime
-import asyncio
 from dbots.protos import chatlogs_pb2
 import brotli
 import hashlib
@@ -68,7 +67,7 @@ class ChatlogModule(Module):
         await self.bot.db.premium.chatlogs.create_index([("creator", pymongo.ASCENDING)])
         await self.bot.db.premium.chatlogs.create_index([("timestamp", pymongo.ASCENDING)])
 
-    @Module.command()
+    @Module.command(default_member_permissions=Permissions.FlagList.administrator)
     async def chatlog(self, ctx):
         """
         Create, load and manage your channel chatlogs

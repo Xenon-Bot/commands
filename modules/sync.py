@@ -34,7 +34,7 @@ class SyncModule(Module):
         await self.bot.db.premium.syncs.create_index([("webhook.id", pymongo.ASCENDING)])
         await self.bot.db.premium.syncs.create_index([("lazy", pymongo.ASCENDING), ("next_lazy", pymongo.ASCENDING)])
 
-    @Module.command()
+    @Module.command(default_member_permissions=Permissions.FlagList.administrator, dm_permission=False)
     async def sync(self, ctx):
         """
         Sync events from one server or channel to another
@@ -43,7 +43,6 @@ class SyncModule(Module):
     @sync.sub_command(extends=dict(
         page="The page to display (default 1)"
     ))
-    @guild_only
     @checks.has_permissions_level()
     async def list(self, ctx, page: int = 1):
         """
@@ -101,7 +100,6 @@ class SyncModule(Module):
     @sync.sub_command(extends=dict(
         sync_id="The id of the previously created sync"
     ))
-    @guild_only
     @checks.has_permissions_level()
     async def delete(self, ctx, sync_id):
         """
@@ -151,7 +149,6 @@ class SyncModule(Module):
             description="Events that should be synced"
         )
     ))
-    @guild_only
     @checks.has_permissions_level()
     @checks.bot_has_permissions("manage_webhooks")
     @checks.cooldown(25, 60 * 30, bucket=checks.CooldownType.AUTHOR, manual=True)
@@ -274,7 +271,6 @@ class SyncModule(Module):
         server_id="The id of the second sever",
         sync_existing="Whether to sync all existing bans and recover from outages"
     ))
-    @guild_only
     @checks.has_permissions_level()
     @checks.bot_has_permissions("ban_members")
     @checks.cooldown(2, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
@@ -369,7 +365,6 @@ class SyncModule(Module):
         ),
         sync_existing="Whether to sync all existing assignments and recover from outages"
     ))
-    @guild_only
     @checks.has_permissions_level()
     @checks.bot_has_permissions("manage_roles")
     @checks.cooldown(5, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
@@ -507,7 +502,6 @@ class SyncModule(Module):
             description="Events that should be synced"
         )
     ))
-    @guild_only
     @checks.has_permissions_level()
     @checks.bot_has_permissions("manage_webhooks")
     @checks.cooldown(2, 30, bucket=checks.CooldownType.AUTHOR, manual=True)
