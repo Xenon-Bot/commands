@@ -42,7 +42,7 @@ def _parse_message_id(channel_id, message):
 
 
 class ExportModule(Module):
-    @Module.command()
+    @Module.command(dm_permission=False)
     async def export(self):
         """
         Export data from discord to JSON or other formats

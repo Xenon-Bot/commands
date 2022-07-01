@@ -78,7 +78,7 @@ class TemplatesModule(Module):
         except (rest.HTTPNotFound, ServerDisconnectedError):
             return None
 
-    @Module.command()
+    @Module.command(default_member_permissions=Permissions.FlagList.administrator)
     async def template(self, ctx):
         """
         Choose from thousands of free server templates
