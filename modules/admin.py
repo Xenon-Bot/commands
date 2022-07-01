@@ -1,4 +1,3 @@
-from os import environ as env
 from dbots.cmd import *
 from dbots import *
 import inspect

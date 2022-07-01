@@ -327,7 +327,7 @@ class BackupsModule(Module):
         data["ephemeral"] = True
         return data
 
-    @Module.command()
+    @Module.command(default_member_permissions=Permissions.FlagList.administrator)
     async def backup(self, ctx):
         """
         Create, load and manage your server backups

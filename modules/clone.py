@@ -1,10 +1,11 @@
-from dbots.cmd import *
-from dbots import *
 import traceback
+
+from dbots import *
+from dbots.cmd import *
 
 
 class CloneModule(Module):
-    @Module.command()
+    @Module.command(default_member_permissions=Permissions.FlagList.administrator, dm_permission=False)
     async def clone(self, ctx):
         """
         Create a clone of a channel or role
@@ -16,7 +17,6 @@ class CloneModule(Module):
             apply_overwrites="Wether to also clone all child channels (only applies if the channel is a category)"
         )
     )
-    @guild_only
     @checks.has_permissions_level(destructive=True)
     @checks.bot_has_permissions("manage_channels")
     @checks.not_in_maintenance
@@ -84,7 +84,6 @@ class CloneModule(Module):
             apply_overwrites="Wether to apply permission overwrites from the original role to the new one"
         )
     )
-    @guild_only
     @checks.has_permissions_level(destructive=True)
     @checks.bot_has_permissions("manage_channels", "manage_roles")
     @checks.not_in_maintenance
