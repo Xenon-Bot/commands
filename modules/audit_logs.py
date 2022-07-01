@@ -70,7 +70,7 @@ class AuditLogModule(Module):
             }
         })
 
-    @Module.command()
+    @Module.command(default_member_permissions=Permissions.FlagList.administrator, dm_permission=False)
     async def audit(self, ctx):
         """
         Get a list of actions that were recently taken on this server
@@ -146,7 +146,6 @@ class AuditLogModule(Module):
     @audit.sub_command(extends=dict(
         page="The page to display (default 1)"
     ))
-    @checks.guild_only
     @checks.has_permissions_level()
     @checks.cooldown(2, 10, bucket=checks.CooldownType.GUILD)
     async def logs(self, ctx, page: int = 1):
