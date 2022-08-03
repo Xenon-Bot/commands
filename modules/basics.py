@@ -1,5 +1,5 @@
 from dbots.cmd import *
-import asyncio
+from dbots import Permissions
 
 FAQ = {
     "How do I invite Xenon to my server?":
@@ -30,8 +30,7 @@ FAQ = {
 
 
 class BasicsModule(Module):
-    @Module.command()
-    @guild_only
+    @Module.command(default_member_permissions=Permissions.FlagList.administrator, dm_permission=False)
     @checks.is_guild_owner
     async def leave(self, ctx):
         """

@@ -1,4 +1,5 @@
 from dbots.cmd import *
+from dbots import Permissions
 
 PERMISSION_DESCRIPTIONS = {
     checks.PermissionLevels.ADMIN_ONLY: "Server admins can create backups, enable the backup interval and "
@@ -10,14 +11,13 @@ PERMISSION_DESCRIPTIONS = {
 
 
 class SettingsModule(Module):
-    @Module.command()
+    @Module.command(default_member_permissions=Permissions.FlagList.administrator, dm_permission=False)
     async def settings(self, ctx):
         """
         Manage Xenon internal settings for this server
         """
 
     @settings.sub_command()
-    @guild_only
     @has_permissions(administrator=True)
     @cooldown(2, 10, bucket=checks.CooldownType.GUILD)
     async def show(self, ctx):
@@ -41,7 +41,6 @@ class SettingsModule(Module):
         }], ephemeral=True)
 
     @settings.sub_command()
-    @guild_only
     @checks.is_guild_owner
     @checks.cooldown(1, 10, bucket=checks.CooldownType.GUILD)
     async def reset(self, ctx):
@@ -77,7 +76,6 @@ class SettingsModule(Module):
                          f"{PERMISSION_DESCRIPTIONS[PermissionLevels.OWNER_ONLY]}"
                          f"```/settings permissions owner```"
     )
-    @guild_only
     @checks.is_guild_owner
     @checks.cooldown(1, 10, bucket=checks.CooldownType.GUILD)
     async def permissions(self, ctx, level):
