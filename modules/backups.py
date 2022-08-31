@@ -1077,7 +1077,7 @@ class BackupsModule(Module):
 
     @backup.sub_command(extends=dict(
         page="The page to display (default 1)",
-        master_kay="The master key (only for encrypted backups)"
+        master_key="The master key (only for encrypted backups)"
     ))
     @checks.cooldown(2, 10, bucket=checks.CooldownType.AUTHOR)
     async def list(self, ctx, page: int = 1, master_key=None):

@@ -143,11 +143,11 @@ class ClipboardModule(Module):
         await self.bot.loop.run_in_executor(None, lambda: data.ParseFromString(brotli.decompress(raw)))
 
         role_route = rest.Route("POST", "/guilds/{guild_id}/roles", guild_id=ctx.guild_id)
-        rl = await ctx.bot.http.get_bucket(role_route.bucket)
-        if rl is not None and rl.remaining < len(data.roles) and "roles" in options:
+        bucket = await ctx.bot.http.get_ratelimit_bucket(role_route)
+        if bucket is not None and bucket["remaining"] < len(data.roles) and "roles" in options:
             await ctx.update(**create_message(
                 f"Due to a **Discord limitation** the bot is **not able to load this server** at the moment.\n\n"
-                f"You have to wait **{timedelta_to_string(timedelta(seconds=rl.delta))}** "
+                f"You have to wait **{timedelta_to_string(timedelta(seconds=bucket['time_remaining']))}** "
                 f"before you can load a server containing this many roles again.\n\n"
                 f"You can also load this server without roles using"
                 f"```/clipboard paste options: !delete_roles !roles```",
