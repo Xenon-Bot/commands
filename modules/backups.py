@@ -1,25 +1,19 @@
 import asyncio
-import base64
-import binascii
-import hashlib
 import json
 from copy import deepcopy
 from datetime import datetime, timedelta
 
 import brotli
-import ecies
 import gridfs
+import grpc
 import pymongo
 import pymongo.errors
-from grpc.aio import AioRpcError
-import grpc
-
 from dbots import *
 from dbots.cmd import *
+from grpc.aio import AioRpcError
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from xenon.backups import backup_pb2
 
-from . import encryption
 from . import premium
 from .audit_logs import AuditLogType
 
@@ -301,13 +295,10 @@ class BackupsModule(Module):
         backups = self.bot.db.backups.find(
             {"creator": user_id},
             sort=[("timestamp", pymongo.DESCENDING)],
-            projection=("_id", "data.name", "timestamp", "encrypted"),
+            projection=("_id", "data.name", "timestamp"),
             limit=25
         )
         async for backup in backups:
-            if backup.get("encrypted"):
-                continue
-
             _backup_id = backup["_id"].upper()
             select_options.append(SelectMenuOption(
                 label=_backup_id,
@@ -857,9 +848,6 @@ class BackupsModule(Module):
         if props.get("large"):
             properties.append("🐘Large")
 
-        if props.get("encrypted"):
-            properties.append("🔒Encrypted")
-
         buttons = [
             Button(
                 style=ButtonStyle.DANGER,
@@ -937,7 +925,7 @@ class BackupsModule(Module):
         backup_id = ctx.values[0]
         return await self._backup_info(ctx, backup_id)
 
-    async def _backup_list_message(self, user_id, page, master_key=None):
+    async def _backup_list_message(self, user_id, page):
         _filter = {"creator": user_id}
         page = max(page, 1)
         total_count = await self.bot.db.backups.count_documents(_filter)
@@ -950,42 +938,23 @@ class BackupsModule(Module):
                 ephemeral=True
             )
 
-        if master_key is not None:
-            try:
-                master_key = base64.b32decode(master_key + "====")
-            except binascii.Error:
-                master_key = None
-
         fields = []
         select_options = []
-        contains_encrypted = False
         async for backup in self.bot.db.backups.find(
                 _filter,
                 sort=[("timestamp", pymongo.DESCENDING)],
                 limit=10,
                 skip=(page - 1) * 10,
-                projection=("_id", "timestamp", "interval", "encrypted", "large", "data.id", "data.name", "data.key")
+                projection=("_id", "timestamp", "interval", "large", "data.id", "data.name", "data.key")
         ):
             properties = []
             if backup.get("interval"):
                 properties.append("⏲️")
 
-            if backup.get("encrypted"):
-                properties.append("🔒")
-
             if backup.get("large"):
                 properties.append("🐘")
 
             backup_id = backup['_id'].upper()
-            if backup.get("encrypted"):
-                backup_id = "encrypted"
-                if master_key is not None:
-                    try:
-                        backup_id = encryption.key_to_id(ecies.decrypt(master_key, backup["data"]["key"]))
-                    except (binascii.Error, ValueError):
-                        contains_encrypted = True
-                else:
-                    contains_encrypted = True
 
             fields.append(dict(
                 name=backup_id + f" • {' '.join(properties)}" * (len(properties) > 0),
@@ -1000,10 +969,6 @@ class BackupsModule(Module):
 
         description = f"Displaying **{(page - 1) * 10 + 1}** - **{min(page * 10, total_count)}** " \
                       f"of **{total_count}** total backups"
-        if contains_encrypted:
-            description += f"\n\n*Some backups are encrypted, supply the master key to see the backup ids.*"
-        if total_count > page * 10 and master_key:
-            description += f"\n\nType `/backup list page: {page + 1}` for the next page"
 
         return dict(
             embeds=[dict(
@@ -1024,24 +989,23 @@ class BackupsModule(Module):
                 ),
                 ActionRow(
                     Button(label="Previous Page", custom_id=f"backup_list", args=[str(page - 1)],
-                           disabled=page <= 1 or master_key),
+                           disabled=page <= 1),
                     Button(label="Next Page", custom_id=f"backup_list", args=[str(page + 1)],
-                           disabled=total_count <= page * 10 or master_key)
+                           disabled=total_count <= page * 10)
                 )
             ],
             ephemeral=True
         )
 
     @backup.sub_command(extends=dict(
-        page="The page to display (default 1)",
-        master_kay="The master key (only for encrypted backups)"
+        page="The page to display (default 1)"
     ))
     @checks.cooldown(2, 10, bucket=checks.CooldownType.AUTHOR)
-    async def list(self, ctx, page: int = 1, master_key=None):
+    async def list(self, ctx, page: int = 1):
         """
         Get a list of all your previously created backups
         """
-        data = await self._backup_list_message(ctx.author.id, page, master_key)
+        data = await self._backup_list_message(ctx.author.id, page)
         await ctx.respond(**data)
 
     @Module.component(name="backup_list")
@@ -1090,14 +1054,6 @@ class BackupsModule(Module):
 
     @Module.component(name="backup_delete_direct_confirm")
     async def delete_direct_confirm(self, ctx, backup_id):
-        if len(backup_id) > 20:
-            try:
-                key_bytes = encryption.id_to_key(backup_id)
-            except binascii.Error:
-                pass
-            else:
-                backup_id = base64.b64encode(hashlib.sha3_512(key_bytes).digest()).decode()
-
         result = await self._delete_backup(ctx.author.id, backup_id)
         if result:
             await ctx.update(**create_message(
@@ -1244,9 +1200,9 @@ class BackupsModule(Module):
                     {"creator": ctx.author.id, "data.id": ctx.guild_id, "interval": True},
                     sort=[("timestamp", pymongo.DESCENDING)],
                     limit=10,
-                    projection=("_id", "timestamp", "encrypted")
+                    projection=("_id", "timestamp")
             ):
-                backup_id = "encrypted" if backup.get("encrypted") else backup["_id"].upper()
+                backup_id = backup["_id"].upper()
                 backups.append(f"**{backup_id}** (<t:{int(backup['timestamp'].timestamp())}:R>)")
 
             await ctx.respond(embeds=[{
@@ -1374,37 +1330,13 @@ class BackupsModule(Module):
             ), ephemeral=True)
 
     async def _backup_exists(self, creator, backup_id):
-        if len(backup_id) > 20:
-            try:
-                key_bytes = encryption.id_to_key(backup_id)
-            except (binascii.Error, ValueError):
-                return False
-
-            identifier = base64.b64encode(hashlib.sha3_512(key_bytes).digest()).decode()
-            doc = await self.bot.db.backups.find_one({"_id": identifier, "creator": creator}, projection=())
-            return doc is not None
-
         doc = await self.bot.db.backups.find_one({"_id": backup_id.lower(), "creator": creator}, projection=())
         return doc is not None
 
     async def _retrieve_backup(self, creator, backup_id):
-        if len(backup_id) > 20:
-            try:
-                key_bytes = encryption.id_to_key(backup_id)
-            except (binascii.Error, ValueError):
-                return None, None
-            identifier = base64.b64encode(hashlib.sha3_512(key_bytes).digest()).decode()
-            doc = await self.bot.db.backups.find_one({"_id": identifier, "creator": creator})
-            if doc is None:
-                return None, None
-
-            _, _, key = encryption.get_symmetric_key(key_bytes, doc["data"]["nonce"])
-            doc["data"]["raw"] = await self.bot.loop.run_in_executor(None, lambda: key.decrypt(doc["data"]["raw"]))
-
-        else:
-            doc = await self.bot.db.backups.find_one({"_id": backup_id.lower(), "creator": creator})
-            if doc is None:
-                return None, None
+        doc = await self.bot.db.backups.find_one({"_id": backup_id.lower(), "creator": creator})
+        if doc is None:
+            return None, None
 
         if doc.get("large"):
             grid_out = await self.grid_fs.open_download_stream(doc["data"]["raw"])
@@ -1425,7 +1357,6 @@ class BackupsModule(Module):
             "timestamp": datetime.utcnow(),
             "version": 2,
             "interval": interval,
-            "encrypted": False,
             "large": False,
             "data": {
                 "id": data.id,
@@ -1433,16 +1364,6 @@ class BackupsModule(Module):
                 "raw": raw
             },
         }
-
-        public_key = await encryption.get_public_key(self.bot, creator)
-        if public_key is not None:
-            key_bytes, nonce_bytes, symmetric_key = encryption.get_symmetric_key()
-            backup_id = encryption.key_to_id(key_bytes)
-            doc["_id"] = base64.b64encode(hashlib.sha3_512(key_bytes).digest()).decode()
-            doc["encrypted"] = True
-            doc["data"]["raw"] = await self.bot.loop.run_in_executor(None, lambda: symmetric_key.encrypt(raw))
-            doc["data"]["nonce"] = nonce_bytes
-            doc["data"]["key"] = ecies.encrypt(public_key, key_bytes)
 
         try:
             await self.bot.db.backups.insert_one(doc)
@@ -1500,8 +1421,8 @@ class BackupsModule(Module):
                     options=["roles", "channels", "settings"],
                     message_count=0
                 ))
-            except GRPCError as e:
-                if e.status == grpclib.Status.NOT_FOUND:
+            except AioRpcError as e:
+                if e.code() == grpc.StatusCode.NOT_FOUND:
                     await self.bot.db.intervals.delete_many({"guild": interval["guild"]})
                     return
                 else:
