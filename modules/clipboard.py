@@ -1,12 +1,13 @@
 from dbots.cmd import *
 from dbots import *
-from dbots.protos import backups_pb2
 from datetime import datetime, timedelta
 import brotli
-import asyncio
-import grpclib
-from grpclib.exceptions import GRPCError
 import json
+
+from grpc.aio import AioRpcError
+import grpc
+
+from xenon.backups import backup_pb2
 
 from .backups import MAX_MESSAGE_COUNT, channel_tree, parse_options, option_list
 from .audit_logs import AuditLogType
@@ -139,7 +140,7 @@ class ClipboardModule(Module):
             ), ephemeral=True)
             return
 
-        data = backups_pb2.BackupData()
+        data = backup_pb2.BackupData()
         await self.bot.loop.run_in_executor(None, lambda: data.ParseFromString(brotli.decompress(raw)))
 
         role_route = rest.Route("POST", "/guilds/{guild_id}/roles", guild_id=ctx.guild_id)
@@ -182,7 +183,7 @@ class ClipboardModule(Module):
         ))
 
         try:
-            replies = await self.bot.rpc.backups.Load(backups_pb2.LoadRequest(
+            replies = await self.bot.rpc.backups.Load(backup_pb2.LoadRequest(
                 guild_id=ctx.guild_id,
                 options=list(options),
                 message_count=message_count,
@@ -190,29 +191,29 @@ class ClipboardModule(Module):
                 reason="Backup loaded by " + str(ctx.author),
                 ids=ids
             ))
-        except GRPCError as e:
-            if e.status == grpclib.Status.ALREADY_EXISTS:
+        except AioRpcError as e:
+            if e.code() == grpc.StatusCode.ALREADY_EXISTS:
                 await ctx.update(**create_message(
                     f"There is **already a loading process running** on this server.\n"
                     f"Please wait for it to finish or use `/backup cancel` to stop it.",
                     f=Format.ERROR
                 ))
                 return
-            elif e.status == grpclib.Status.NOT_FOUND:
+            elif e.code() == grpc.StatusCode.NOT_FOUND:
                 await ctx.update(**create_message(
                     f"Xenon doesn't seem to be on this server, "
                     f"please click [here](https://xenon.bot/invite) to invite it again.",
                     f=Format.ERROR
                 ))
                 return
-            elif e.status == grpclib.Status.RESOURCE_EXHAUSTED:
+            elif e.code() == grpc.StatusCode.RESOURCE_EXHAUSTED:
                 await ctx.update(**create_message(
                     f"Xenon is currently experiencing increased load and can't process your request, "
                     f"please **try again in a few minutes**.",
                     f=Format.ERROR
                 ))
                 return
-            elif e.status == grpclib.Status.CANCELLED:
+            elif e.code() == grpc.StatusCode.CANCELLED:
                 return
             else:
                 raise
@@ -261,7 +262,7 @@ class ClipboardModule(Module):
             ), ephemeral=True)
             return
 
-        data = backups_pb2.BackupData()
+        data = backup_pb2.BackupData()
         await self.bot.loop.run_in_executor(None, lambda: data.ParseFromString(brotli.decompress(raw)))
 
         channel_list = channel_tree(data.channels)

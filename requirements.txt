@@ -1,8 +1,8 @@
-git+git://github.com/Xenon-Bot/pylib
+# git+git://github.com/Xenon-Bot/pylib
 motor==2.3
 aioredis==1.3.1
 aiocontextvars==0.2.2
-grpclib
+grpcio
 brotli
 eciespy
 orjson

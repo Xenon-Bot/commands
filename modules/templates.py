@@ -1,12 +1,13 @@
+import json
+from datetime import timedelta, datetime
+
+import grpc
+import pymongo
 from aiohttp import ServerDisconnectedError
 from dbots import *
 from dbots.cmd import *
-from datetime import timedelta, datetime
-from grpclib.exceptions import GRPCError
-from dbots.protos import backups_pb2
-import grpclib
-import json
-import pymongo
+from grpc.aio import AioRpcError
+from xenon.backups import backup_pb2
 
 from .audit_logs import AuditLogType
 from .backups import option_status_list, convert_v1_to_v2, channel_tree, parse_options, create_warning_message
@@ -254,47 +255,47 @@ class TemplatesModule(Module):
         ))
 
         try:
-            replies = await self.bot.rpc.backups.Load(backups_pb2.LoadRequest(
+            replies = [reply async for reply in self.bot.rpc.backups.Load(backup_pb2.LoadRequest(
                 guild_id=ctx.guild_id,
                 options=list(options),
                 message_count=0,
                 data=data,
                 reason="Template loaded by " + str(ctx.author),
                 ids=ids
-            ))
-        except GRPCError as e:
-            if e.status == grpclib.Status.ALREADY_EXISTS:
+            ))]
+        except AioRpcError as e:
+            if e.code() == grpc.StatusCode.ALREADY_EXISTS:
                 await ctx.update(**create_message(
                     f"There is **already a loading process running** on this server.\n"
                     f"Please wait for it to finish or use `/template cancel` to stop it.",
                     f=Format.ERROR
                 ))
                 return
-            elif e.status == grpclib.Status.NOT_FOUND:
+            elif e.code() == grpc.StatusCode.NOT_FOUND:
                 await ctx.update(**create_message(
                     f"Xenon doesn't seem to be on this server, "
                     f"please click [here](<{await ctx.bot.get_invite()}>) to invite it again.",
                     f=Format.ERROR
                 ))
                 return
-            elif e.status == grpclib.Status.RESOURCE_EXHAUSTED:
+            elif e.code() == grpc.StatusCode.RESOURCE_EXHAUSTED:
                 await ctx.update(**create_message(
                     f"Xenon is currently experiencing increased load and can't process your request, "
                     f"please **try again in a few minutes**.",
                     f=Format.ERROR
                 ))
                 return
-            elif e.status == grpclib.Status.OUT_OF_RANGE:
+            elif e.code() == grpc.StatusCode.OUT_OF_RANGE:
                 await ctx.update(**create_message(
                     f"Due to a **Discord limitation** the bot is **not able to load this template** at the moment.\n\n"
-                    f"You have to wait **{timedelta_to_string(timedelta(seconds=int(e.message)))}** "
+                    f"You have to wait **{timedelta_to_string(timedelta(seconds=int(e.details())))}** "
                     f"before you can load a template containing this many roles again.\n\n"
                     f"You can also load this template without roles using"
                     f"```/template load name_or_id: {name_or_id} options: !delete_roles !roles```",
                     f=Format.ERROR
                 ))
                 return
-            elif e.status == grpclib.Status.CANCELLED:
+            elif e.code() == grpc.StatusCode.CANCELLED:
                 return
             else:
                 raise
@@ -338,9 +339,9 @@ class TemplatesModule(Module):
         Cancel the currently running loading process on this server
         """
         try:
-            await self.bot.rpc.backups.CancelLoad(backups_pb2.CancelLoadRequest(guild_id=ctx.guild_id))
-        except GRPCError as e:
-            if e.status == grpclib.Status.NOT_FOUND:
+            await self.bot.rpc.backups.CancelLoad(backup_pb2.CancelLoadRequest(guild_id=ctx.guild_id))
+        except AioRpcError as e:
+            if e.code() == grpc.StatusCode.NOT_FOUND:
                 await ctx.respond(**create_message(
                     "There is **no loading process running** on this server.",
                     f=Format.ERROR
@@ -363,9 +364,9 @@ class TemplatesModule(Module):
         Get the status of the currently running loading process
         """
         try:
-            reply = await self.bot.rpc.backups.LoadStatus(backups_pb2.LoadStatusRequest(guild_id=ctx.guild_id))
-        except GRPCError as e:
-            if e.status == grpclib.Status.NOT_FOUND:
+            reply = await self.bot.rpc.backups.LoadStatus(backup_pb2.LoadStatusRequest(guild_id=ctx.guild_id))
+        except AioRpcError as e:
+            if e.code() == grpc.StatusCode.NOT_FOUND:
                 await ctx.respond(**create_message(
                     "There is **no loading process running** on this server.",
                     f=Format.ERROR
@@ -377,7 +378,7 @@ class TemplatesModule(Module):
         estimated_time_left = sum([
             o.estimated_time_left
             for o in reply.options.values()
-            if o.state != backups_pb2.LoadStatus.State.WAITING
+            if o.state != backup_pb2.LoadStatus.State.STATE_WAITING
         ])
 
         minutes = estimated_time_left // 60
@@ -389,7 +390,7 @@ class TemplatesModule(Module):
 
         details = "\n\n" + "\n".join([f"```{o.details}```" for o in reply.options.values() if o.details])
         for o in reply.options.values():
-            if o.state == backups_pb2.LoadStatus.State.RATE_LIMIT:
+            if o.state == backup_pb2.LoadStatus.State.STATE_RATE_LIMIT:
                 details += f"\n```A long lasting ratelimit has been hit, " \
                            f"you might want to cancel the loading process.```"
                 break

@@ -1,16 +1,17 @@
-from dbots.cmd import *
-from dbots import *
 import base64
 import binascii
-import pymongo
-import ecies
-from datetime import datetime
-from dbots.protos import chatlogs_pb2
-import brotli
 import hashlib
-from grpclib.exceptions import GRPCError
-import grpclib
 import json
+from datetime import datetime
+
+import brotli
+import ecies
+import grpc
+import pymongo
+from dbots import *
+from dbots.cmd import *
+from grpc.aio import AioRpcError
+from xenon.chatlogs import chatlog_pb2
 
 from util import PremiumLevel
 from . import encryption
@@ -35,19 +36,19 @@ def convert_v1_to_v2(data):
     messages = []
     users = {}
     for message in data:
-        users[message["author"]["id"]] = chatlogs_pb2.ChatlogData.User(
+        users[message["author"]["id"]] = chatlog_pb2.ChatlogData.User(
             username=message["author"]["username"],
             discriminator=message["author"]["discriminator"],
             avatar=message["author"]["avatar"]
         )
 
-        messages.append(chatlogs_pb2.ChatlogData.Message(
+        messages.append(chatlog_pb2.ChatlogData.Message(
             id=message["id"],
             content=message["content"],
             pinned=message["pinned"],
             author_id=message["author"]["id"],
             attachments=[
-                chatlogs_pb2.ChatlogData.Message.Attachment(
+                chatlog_pb2.ChatlogData.Message.Attachment(
                     filename=attachment["filename"],
                     url=attachment["url"]
                 )
@@ -59,7 +60,7 @@ def convert_v1_to_v2(data):
             ]
         ))
 
-    return chatlogs_pb2.ChatlogData(messages=messages, users=users)
+    return chatlog_pb2.ChatlogData(messages=messages, users=users)
 
 
 class ChatlogModule(Module):
@@ -119,7 +120,7 @@ class ChatlogModule(Module):
             f=Format.PLEASE_WAIT
         ), ephemeral=True)
 
-        reply = await self.bot.rpc.chatlogs.Create(chatlogs_pb2.CreateRequest(
+        reply = await self.bot.rpc.chatlogs.Create(chatlog_pb2.CreateRequest(
             channel_id=ctx.channel_id,
             message_count=message_count,
             before_id=before
@@ -236,21 +237,21 @@ class ChatlogModule(Module):
             max_file_size = 8e6
 
         try:
-            await self.bot.rpc.chatlogs.Load(chatlogs_pb2.LoadRequest(
+            await self.bot.rpc.chatlogs.Load(chatlog_pb2.LoadRequest(
                 channel_id=ctx.channel_id,
                 message_count=message_count,
                 max_file_size=int(max_file_size),
                 data=data
             ))
-        except GRPCError as e:
-            if e.status == grpclib.Status.NOT_FOUND:
+        except AioRpcError as e:
+            if e.code() == grpc.StatusCode.NOT_FOUND:
                 await ctx.update(**create_message(
                     f"Xenon doesn't seem to be on this server, "
                     f"please click [here](https://xenon.bot/invite) to invite it again.",
                     f=Format.ERROR
                 ))
                 return
-            elif e.status == grpclib.Status.CANCELLED:
+            elif e.code() == grpc.StatusCode.CANCELLED:
                 return
             else:
                 raise
@@ -529,7 +530,7 @@ class ChatlogModule(Module):
             if doc is None:
                 return None, None
 
-        data = chatlogs_pb2.ChatlogData()
+        data = chatlog_pb2.ChatlogData()
         await self.bot.loop.run_in_executor(None, lambda: data.ParseFromString(brotli.decompress(doc["data"]["raw"])))
         del doc["data"]
         return doc, data
