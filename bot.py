@@ -10,16 +10,19 @@ from datetime import datetime
 import grpc.aio
 from xenon.backups import backup_pb2_grpc
 from xenon.chatlogs import chatlog_pb2_grpc
+from xenon.mutations import service_pb2_grpc as mutation_pb2_grpc
 
 from util import *
 
 
 class RpcCollection:
-    def __init__(self, host):
-        channel = grpc.aio.insecure_channel(host)
+    def __init__(self):
+        backups_channel = grpc.aio.insecure_channel(env.get("BACKUPS_SERVICE", "127.0.0.1:8081"))
+        self.backups = backup_pb2_grpc.BackupServiceStub(backups_channel)
+        self.chatlogs = chatlog_pb2_grpc.ChatlogServiceStub(backups_channel)
 
-        self.chatlogs = chatlog_pb2_grpc.ChatlogServiceStub(channel)
-        self.backups = backup_pb2_grpc.BackupServiceStub(channel)
+        mutations_channel = grpc.aio.insecure_channel(env.get("BACKUPS_SERVICE", "127.0.0.1:8082"))
+        self.mutations = mutation_pb2_grpc.MutationServiceStub(mutations_channel)
 
 
 class Xenon(InteractionBot):
@@ -113,6 +116,8 @@ class Xenon(InteractionBot):
         if user_doc is not None:
             premium_level = user_doc.get("tier", 0)
 
+        premium_level = 3
+
         payload.premium_level = PremiumLevel(premium_level)
 
         allowed_commands = {
@@ -165,6 +170,6 @@ class Xenon(InteractionBot):
         return invite
 
     async def setup(self, redis_url="redis://localhost"):
-        self.rpc = RpcCollection(env.get("BACKUPS_SERVICE", "127.0.0.1:8081"))
+        self.rpc = RpcCollection()
         self.mongo = AsyncIOMotorClient(env.get("MONGO_URL", "mongodb://localhost"))
         await super().setup(redis_url)

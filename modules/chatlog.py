@@ -14,7 +14,6 @@ from grpc.aio import AioRpcError
 from xenon.chatlogs import chatlog_pb2
 
 from util import PremiumLevel
-from . import encryption
 from .audit_logs import AuditLogType
 
 MAX_MESSAGE_COUNT = {
@@ -313,8 +312,7 @@ class ChatlogModule(Module):
         }], ephemeral=True)
 
     @chatlog.sub_command(extends=dict(
-        page="The page to display (default 1)",
-        master_kay="The master key (only for encrypted chatlogs)"
+        page="The page to display (default 1)"
     ))
     @checks.cooldown(2, 10, bucket=checks.CooldownType.AUTHOR)
     async def list(self, ctx, page: int = 1, master_key: str = None):
@@ -331,35 +329,17 @@ class ChatlogModule(Module):
             ), ephemeral=True)
             return
 
-        if master_key is not None:
-            try:
-                master_key = base64.b32decode(master_key + "====")
-            except binascii.Error:
-                master_key = None
-
         fields = []
-        contains_encrypted = False
         async for chatlog in self.bot.db.premium.chatlogs.find(
                 _filter,
                 sort=[("timestamp", pymongo.DESCENDING)],
                 limit=10,
                 skip=(page - 1) * 10,
-                projection=("_id", "timestamp", "encrypted", "data.key", "channel")
+                projection=("_id", "timestamp", "data.key", "channel")
         ):
             properties = []
-            if chatlog.get("encrypted"):
-                properties.append("🔒")
 
             chatlog_id = chatlog['_id'].upper()
-            if chatlog.get("encrypted"):
-                chatlog_id = "encrypted"
-                if master_key is not None:
-                    try:
-                        chatlog_id = encryption.key_to_id(ecies.decrypt(master_key, chatlog["data"]["key"]))
-                    except (binascii.Error, ValueError):
-                        contains_encrypted = True
-                else:
-                    contains_encrypted = True
 
             fields.append(dict(
                 name=chatlog_id + f" • {' '.join(properties)}" * (len(properties) > 0),
@@ -368,8 +348,6 @@ class ChatlogModule(Module):
 
         description = f"Displaying **{(page - 1) * 10 + 1}** - **{min(page * 10, total_count)}** " \
                       f"of **{total_count}** total chatlogs"
-        if contains_encrypted:
-            description += f"\n\n*Some chatlogs are encrypted, supply the master key to see the chatlog ids.*"
         if total_count > page * 10:
             description += f"\n\nType `/chatlog list page: {page + 1}` for the next page"
 
@@ -491,44 +469,19 @@ class ChatlogModule(Module):
             "creator": creator,
             "timestamp": datetime.utcnow(),
             "channel": channel,
-            "encrypted": False,
             "data": {
                 "id": channel,
                 "raw": raw
             }
         }
 
-        public_key = await encryption.get_public_key(self.bot, creator)
-        if public_key is not None:
-            key_bytes, nonce_bytes, symmetric_key = encryption.get_symmetric_key()
-            chatlog_id = encryption.key_to_id(key_bytes)
-            doc["_id"] = base64.b64encode(hashlib.sha3_512(key_bytes).digest()).decode()
-            doc["encrypted"] = True
-            doc["data"]["raw"] = await self.bot.loop.run_in_executor(None, lambda: symmetric_key.encrypt(raw))
-            doc["data"]["nonce"] = nonce_bytes
-            doc["data"]["key"] = ecies.encrypt(public_key, key_bytes)
-
         await self.bot.db.premium.chatlogs.insert_one(doc)
         return chatlog_id
 
     async def _retrieve_chatlog(self, creator, chatlog_id):
-        if len(chatlog_id) > 20:
-            try:
-                key_bytes = encryption.id_to_key(chatlog_id)
-            except (binascii.Error, ValueError):
-                return None, None
-            identifier = base64.b64encode(hashlib.sha3_512(key_bytes).digest()).decode()
-            doc = await self.bot.db.premium.chatlogs.find_one({"_id": identifier, "creator": creator})
-            if doc is None:
-                return None, None
-
-            _, _, key = encryption.get_symmetric_key(key_bytes, doc["data"]["nonce"])
-            doc["data"]["raw"] = await self.bot.loop.run_in_executor(None, lambda: key.decrypt(doc["data"]["raw"]))
-
-        else:
-            doc = await self.bot.db.premium.chatlogs.find_one({"_id": chatlog_id.lower(), "creator": creator})
-            if doc is None:
-                return None, None
+        doc = await self.bot.db.premium.chatlogs.find_one({"_id": chatlog_id.lower(), "creator": creator})
+        if doc is None:
+            return None, None
 
         data = chatlog_pb2.ChatlogData()
         await self.bot.loop.run_in_executor(None, lambda: data.ParseFromString(brotli.decompress(doc["data"]["raw"])))

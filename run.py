@@ -27,12 +27,10 @@ modules = {
     templates.TemplatesModule,
     admin.AdminModule,
     clone.CloneModule,
-    # encryption.EncryptionModule
     chatlog.ChatlogModule,
     clipboard.ClipboardModule,
     sync.SyncModule,
-    export.ExportModule,
-    # mutations.MutationsModule
+    export.ExportModule
 }
 for module in modules:
     bot.load_module(module(bot))
