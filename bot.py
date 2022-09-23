@@ -113,8 +113,6 @@ class Xenon(InteractionBot):
         if user_doc is not None:
             premium_level = user_doc.get("tier", 0)
 
-        premium_level = 3
-
         payload.premium_level = PremiumLevel(premium_level)
 
         allowed_commands = {
