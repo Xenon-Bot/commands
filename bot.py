@@ -7,13 +7,15 @@ import asyncio
 import traceback
 import sys
 from datetime import datetime
-import grpclib.client
-from dbots.protos import backups_grpc
+import grpc.aio
+from xenon.backups import backup_pb2_grpc
 
 
 class RpcCollection:
     def __init__(self, host):
-        self.backups = backups_grpc.BackupsStub(grpclib.client.Channel(*host.split(":")))
+        channel = grpc.aio.insecure_channel(host)
+
+        self.backups = backup_pb2_grpc.BackupServiceStub(channel)
 
 
 class Xenon(InteractionBot):
