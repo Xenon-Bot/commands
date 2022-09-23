@@ -26,7 +26,8 @@ modules = {
     premium.PremiumModule,
     admin.AdminModule,
     clone.CloneModule,
-    export.ExportModule
+    export.ExportModule,
+    mutations.MutationsModule
 }
 for module in modules:
     bot.load_module(module(bot))
