@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dbots.cmd import *
 
 from bot import Xenon
-from modules import backups, basics, settings, audit_logs, templates, premium, admin, clone, encryption, export
+from modules import backups, basics, settings, audit_logs, templates, premium, admin, clone, export, mutations
 
 Format.ERROR.components = [ActionRow(
     Button(label="Wiki", url="https://wiki.xenon.bot", emoji="📚"),
@@ -26,7 +26,6 @@ modules = {
     premium.PremiumModule,
     admin.AdminModule,
     clone.CloneModule,
-    # encryption.EncryptionModule
     export.ExportModule
 }
 for module in modules:
