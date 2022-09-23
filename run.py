@@ -7,7 +7,7 @@ from aiohttp import web
 from bot import Xenon
 from dbots.cmd import *
 from modules import backups, basics, settings, audit_logs, templates, admin, clone, chatlog, clipboard, \
-    sync, export
+    sync, export, mutations
 
 Format.ERROR.components = [ActionRow(
     Button(label="Wiki", url="https://wiki.xenon.bot", emoji="📚"),
@@ -30,7 +30,8 @@ modules = {
     chatlog.ChatlogModule,
     clipboard.ClipboardModule,
     sync.SyncModule,
-    export.ExportModule
+    export.ExportModule,
+    mutations.MutationsModule
 }
 for module in modules:
     bot.load_module(module(bot))

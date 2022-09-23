@@ -1,18 +1,19 @@
+import asyncio
+import json
+import sys
+import traceback
+from datetime import datetime
+from os import environ as env
+
+import grpc.aio
 from dbots import *
 from dbots.cmd import *
 from motor.motor_asyncio import AsyncIOMotorClient
-import json
-from os import environ as env
-import asyncio
-import traceback
-import sys
-from datetime import datetime
-import grpc.aio
 from xenon.backups import backup_pb2_grpc
 from xenon.chatlogs import chatlog_pb2_grpc
 from xenon.mutations import service_pb2_grpc as mutation_pb2_grpc
 
-from util import *
+from util import PremiumLevel
 
 
 class RpcCollection:
@@ -115,8 +116,6 @@ class Xenon(InteractionBot):
         user_doc = await self.db.users.find_one({"_id": payload.author.id})
         if user_doc is not None:
             premium_level = user_doc.get("tier", 0)
-
-        premium_level = 3
 
         payload.premium_level = PremiumLevel(premium_level)
 
