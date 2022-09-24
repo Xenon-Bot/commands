@@ -6,21 +6,22 @@ from datetime import datetime
 from os import environ as env
 
 import grpc.aio
-from dbots import *
-from dbots.cmd import *
 from motor.motor_asyncio import AsyncIOMotorClient
 from xenon.backups import backup_pb2_grpc
 from xenon.mutations import service_pb2_grpc as mutation_pb2_grpc
 
+import config
+from dbots import *
+from dbots.cmd import *
 from util import PremiumLevel
 
 
 class RpcCollection:
     def __init__(self):
-        backups_channel = grpc.aio.insecure_channel(env.get("BACKUPS_SERVICE", "127.0.0.1:8081"))
+        backups_channel = grpc.aio.insecure_channel(config.BACKUPS_SERVICES)
         self.backups = backup_pb2_grpc.BackupServiceStub(backups_channel)
 
-        mutations_channel = grpc.aio.insecure_channel(env.get("BACKUPS_SERVICE", "127.0.0.1:8082"))
+        mutations_channel = grpc.aio.insecure_channel(config.MUTATIONS_SERVICE)
         self.mutations = mutation_pb2_grpc.MutationServiceStub(mutations_channel)
 
 
@@ -142,5 +143,5 @@ class Xenon(InteractionBot):
 
     async def setup(self, redis_url="redis://localhost"):
         self.rpc = RpcCollection()
-        self.mongo = AsyncIOMotorClient(env.get("MONGO_URL", "mongodb://localhost"))
+        self.mongo = AsyncIOMotorClient(config.MONGO_URL)
         await super().setup(redis_url)

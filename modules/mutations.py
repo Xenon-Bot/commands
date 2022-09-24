@@ -15,6 +15,19 @@ MUTATION_TITLES = dict(
     channel_update="Channel Updated",
     channel_delete="Channel Deleted",
     channel_create="Channel Created",
+    thread_update="Thread Updated",
+    thread_delete="Thread Deleted",
+    thread_create="Thread Created",
+    role_update="Role Updated",
+    role_delete="Role Deleted",
+    role_create="Role Created",
+    bans_update="Ban Updated",
+    emoji_create="Emoji Created",
+    emoji_delete="Emoji Deleted",
+    emoji_update="Emoji Updated",
+    sticker_create="Sticker Created",
+    sticker_delete="Sticker Deleted",
+    sticker_update="Sticker Updated",
 )
 
 
@@ -127,7 +140,7 @@ class MutationsModule(Module):
         return list(reversed(mutations))
 
     async def _get_changes_list_page(self, guild_id, start_timestamp, end_timestamp, skip=0):
-        mutations, more_in_bucket = await self._list_mutations(guild_id, start_timestamp, end_timestamp, skip)
+        mutations = await self._list_mutations(guild_id, start_timestamp, end_timestamp, skip)
 
         if len(mutations) == 0:
             return dict(
@@ -164,7 +177,7 @@ class MutationsModule(Module):
             next_args = [str(start_timestamp), str(end_timestamp) if end_timestamp else "",
                          str(max(skip - MUTATIONS_PER_PAGE, 0))]
 
-        if more_in_bucket:
+        if len(mutations) >= MUTATIONS_PER_PAGE:
             # We just assume there are more in the bucket
             previous_args = [str(start_timestamp), str(end_timestamp) if end_timestamp else "",
                              str(skip + MUTATIONS_PER_PAGE)]
@@ -257,8 +270,8 @@ class MutationsModule(Module):
                 ActionRow(
                     Button(style=ButtonStyle.PRIMARY, label="Revert Change", custom_id=f"revert_preview",
                            args=["one", mutation_id]),
-                    Button(style=ButtonStyle.SECONDARY, label="Revert All After This", custom_id=f"revert_preview",
-                           args=["until", mutation_id])
+                    # Button(style=ButtonStyle.SECONDARY, label="Revert All After This", custom_id=f"revert_preview",
+                    #        args=["until", mutation_id])
                 )
             ],
             ephemeral=True
