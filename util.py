@@ -9,7 +9,7 @@ __all__ = (
     "PREMIUM_REQUIRED_TEXT"
 )
 
-CAN_UPSELL = False
+CAN_UPSELL = True
 PREMIUM_REQUIRED_TEXT = "You **need** to buy **Xenon Premium** to be able to use this bot and its commands.\n\n" \
                         "You can **buy Premium [here](<https://patreon.com/merlinfuchs>)** and " \
                         "get a full list of features [here](<https://wiki.xenon.bot/premium>).\n\n\n" \
