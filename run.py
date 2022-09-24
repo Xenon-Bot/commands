@@ -6,8 +6,7 @@ from aiohttp import web
 import config
 from bot import Xenon
 from dbots.cmd import *
-from modules import backups, basics, settings, audit_logs, templates, admin, clone, chatlog, clipboard, \
-    sync, export, mutations
+from modules import backups, basics, settings, audit_logs, templates, clone, chatlog, clipboard, sync, export, mutations
 
 Format.ERROR.components = [ActionRow(
     Button(label="Wiki", url="https://wiki.xenon.bot", emoji="📚"),
@@ -16,7 +15,8 @@ Format.ERROR.components = [ActionRow(
 
 bot = Xenon(
     public_key=config.PUBLIC_KEY,
-    guild_id=config.GUILD_ID
+    guild_id=config.GUILD_ID,
+    beta_guild_id=config.BETA_GUILD_ID,
 )
 modules = {
     backups.BackupsModule,
@@ -24,7 +24,6 @@ modules = {
     settings.SettingsModule,
     audit_logs.AuditLogModule,
     templates.TemplatesModule,
-    admin.AdminModule,
     clone.CloneModule,
     chatlog.ChatlogModule,
     clipboard.ClipboardModule,
