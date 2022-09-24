@@ -38,7 +38,7 @@ async def premium_required(ctx, **_):
 
 @Check
 async def entitlement_required(ctx, **_):
-    if len(ctx.entitlement_sku_ids) and ctx.premium_level == PremiumLevel.NONE:
+    if len(ctx.entitlement_sku_ids) == 0 and ctx.premium_level == PremiumLevel.NONE:
         if CAN_UPSELL:
             await ctx.upsell()
         else:

@@ -4,6 +4,7 @@ from os import environ as env
 
 from aiohttp import web
 
+import config
 from bot import Xenon
 from dbots.cmd import *
 from modules import backups, basics, settings, audit_logs, templates, admin, clone, chatlog, clipboard, \
@@ -15,9 +16,8 @@ Format.ERROR.components = [ActionRow(
 )]
 
 bot = Xenon(
-    public_key=env.get("PUBLIC_KEY"),
-    token=env.get("TOKEN"),
-    guild_id=env.get("GUILD_ID")
+    public_key=config.PUBLIC_KEY,
+    guild_id=config.GUILD_ID
 )
 modules = {
     backups.BackupsModule,
@@ -51,5 +51,4 @@ if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     loop.set_default_executor(ThreadPoolExecutor(max_workers=10))
     app.add_routes([web.post("/entry", bot.aiohttp_entry)])
-    host = env.get("HOST", "127.0.0.1:8080").split(":")
-    web.run_app(app, host=host[0], port=int(host[1]))
+    web.run_app(app, host=config.HOST, port=config.PORT)
