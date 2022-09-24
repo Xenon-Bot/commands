@@ -8,12 +8,13 @@ import gridfs
 import grpc
 import pymongo
 import pymongo.errors
-from dbots import *
-from dbots.cmd import *
 from grpc.aio import AioRpcError
 from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from xenon.backups import backup_pb2
 
+from dbots import *
+from dbots.cmd import *
+from util import can_upsell
 from . import premium
 from .audit_logs import AuditLogType
 
@@ -1261,12 +1262,16 @@ class BackupsModule(Module):
             interval_td = timedelta(hours=24)
 
         hours = interval_td.total_seconds() // 3600
-        if hours < 24:
-            await ctx.respond(
-                premium.PREMIUM_ONLY_TEXT.replace("This command", "Intervals below `24 hours`"),
-                components=premium.PREMIUM_COMPONENTS,
-                ephemeral=True
-            )
+        keep = 4 if len(ctx.entitlement_sku_ids) != 0 else 1
+        if hours < 24 and len(ctx.entitlement_sku_ids) == 0:
+            if can_upsell(ctx):
+                await ctx.upsell()
+            else:
+                await ctx.respond(
+                    premium.PREMIUM_ONLY_TEXT.replace("This command", "Intervals below `24 hours`"),
+                    components=premium.PREMIUM_COMPONENTS,
+                    ephemeral=True
+                )
             return
 
         interval_td = timedelta(hours=hours)
@@ -1275,6 +1280,7 @@ class BackupsModule(Module):
         await ctx.bot.db.intervals.update_one({"guild": ctx.guild_id, "user": ctx.author.id}, {"$set": {
             "guild": ctx.guild_id,
             "user": ctx.author.id,
+            "keep": keep,
             "last": now,
             "next": now,
             "interval": hours
@@ -1432,11 +1438,23 @@ class BackupsModule(Module):
             if data is None:
                 return
 
-            await self.bot.db.backups.delete_many({
-                "data.id": interval["guild"],
-                "creator": interval["user"],
-                "interval": True,
-            })
+            keep = interval.get("keep", 1)
+            if keep == 1:
+                await self.bot.db.backups.delete_many({
+                    "data.id": interval["guild"],
+                    "creator": interval["user"],
+                    "interval": True,
+                })
+            else:
+                existing_count = 0
+                async for backup in self.bot.db.backups.find({
+                    "data.id": interval["guild"],
+                    "creator": interval["user"],
+                    "interval": True,
+                }, sort=[("timestamp", pymongo.DESCENDING)], projection=[]):
+                    existing_count += 1
+                    if existing_count >= keep:
+                        await self.bot.db.backups.delete_one({"_id": backup["_id"]})
 
             await self._store_backup(interval["user"], data, interval=True)
         finally:

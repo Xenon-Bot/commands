@@ -14,3 +14,5 @@ _host = env.get("HOST", "127.0.0.1:8080").split(":")
 
 HOST = _host[0]
 PORT = int(_host[1])
+
+CAN_UPSELL = bool(env.get("CAN_UPSELL", False))
