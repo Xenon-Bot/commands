@@ -401,7 +401,8 @@ class BackupsModule(Module):
                 raise
 
         data = replies[-1].data
-        backup_id = await self._store_backup(ctx.author.id, data)
+        expires = len(ctx.entitlement_sku_ids) == 0
+        backup_id = await self._store_backup(ctx.author.id, data, expires=expires)
 
         await ctx.edit_response(**create_message(
             f"Successfully **created backup** with the id `{backup_id}`.\n\n"
@@ -1407,9 +1408,11 @@ class BackupsModule(Module):
         del doc["data"]
         return doc, data
 
-    async def _store_backup(self, creator, data, interval=False):
+    async def _store_backup(self, creator, data, interval=False, expires=True):
         raw = await self.bot.loop.run_in_executor(None, lambda: brotli.compress(data.SerializeToString()))
         backup_id = unique_id().upper()
+
+        expires_at = datetime.utcnow() + timedelta(days=365)
 
         doc = {
             "_id": backup_id.lower(),
@@ -1418,6 +1421,7 @@ class BackupsModule(Module):
             "version": 2,
             "interval": interval,
             "large": False,
+            "expires_at": expires_at if expires else None,
             "data": {
                 "id": data.id,
                 "name": data.name,
