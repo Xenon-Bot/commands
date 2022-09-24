@@ -401,8 +401,7 @@ class BackupsModule(Module):
                 raise
 
         data = replies[-1].data
-        expires = len(ctx.entitlement_sku_ids) == 0
-        backup_id = await self._store_backup(ctx.author.id, data, expires=expires)
+        backup_id = await self._store_backup(ctx.author.id, data, expires=False)
 
         await ctx.edit_response(**create_message(
             f"Successfully **created backup** with the id `{backup_id}`.\n\n"
