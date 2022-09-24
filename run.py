@@ -15,7 +15,8 @@ Format.ERROR.components = [ActionRow(
 
 bot = Xenon(
     public_key=config.PUBLIC_KEY,
-    guild_id=config.GUILD_ID
+    guild_id=config.GUILD_ID,
+    beta_guild_id=config.BETA_GUILD_ID,
 )
 modules = {
     backups.BackupsModule,

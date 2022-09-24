@@ -2,6 +2,7 @@ from os import environ as env
 
 PUBLIC_KEY = public_key = env.get("PUBLIC_KEY")
 GUILD_ID = env.get("GUILD_ID")
+BETA_GUILD_ID = GUILD_ID or env.get("BETA_GUILD_ID")
 
 MONGO_URL = env.get("MONGO_URL", "mongodb://localhost")
 REDIS_URL = env.get("REDIS_URL", "redis://localhost")

@@ -2,11 +2,11 @@ import json
 from datetime import datetime, timedelta
 
 import grpc
-from dbots import *
-from dbots.cmd import *
 from grpc.aio import AioRpcError
 from xenon.mutations import service_pb2
 
+from dbots import *
+from dbots.cmd import *
 from util import *
 
 MUTATIONS_PER_PAGE = 10
@@ -79,7 +79,7 @@ def get_mutation_value_list(data, max_values=3):
 
 
 class MutationsModule(Module):
-    @Module.command(default_member_permissions=Permissions.FlagList.administrator, dm_permission=False)
+    @Module.command(default_member_permissions=Permissions.FlagList.administrator, dm_permission=False, beta=True)
     async def changes(self, ctx):
         """
         View and revert changes made to your Discord server
