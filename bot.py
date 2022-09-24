@@ -3,7 +3,6 @@ import json
 import sys
 import traceback
 from datetime import datetime
-from os import environ as env
 
 import grpc.aio
 from motor.motor_asyncio import AsyncIOMotorClient

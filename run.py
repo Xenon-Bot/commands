@@ -1,6 +1,5 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from os import environ as env
 
 from aiohttp import web
 
@@ -38,7 +37,7 @@ app = web.Application()
 
 @app.on_startup.append
 async def prepare_bot(*_):
-    await bot.setup(env.get("REDIS_URL", "redis://localhost"))
+    await bot.setup(config.REDIS_URL)
     # await bot.http.replace_guild_commands(bot.guild_id, [])
     # await bot.http.replace_global_commands([])
     # await bot.push_commands()
