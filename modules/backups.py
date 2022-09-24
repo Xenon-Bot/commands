@@ -1493,15 +1493,22 @@ class BackupsModule(Module):
                 return
 
             keep = interval.get("keep", 1)
-            existing_count = 0
-            async for backup in self.bot.db.backups.find({
-                "data.id": interval["guild"],
-                "creator": interval["user"],
-                "interval": True,
-            }, sort=[("timestamp", pymongo.DESCENDING)], projection=[]):
-                existing_count += 1
-                if existing_count >= keep:
-                    await self.bot.db.backups.delete_one({"_id": backup["_id"]})
+            if keep == 1:
+                await self.bot.db.backups.delete_many({
+                    "data.id": interval["guild"],
+                    "creator": interval["user"],
+                    "interval": True,
+                })
+            else:
+                existing_count = 0
+                async for backup in self.bot.db.backups.find({
+                    "data.id": interval["guild"],
+                    "creator": interval["user"],
+                    "interval": True,
+                }, sort=[("timestamp", pymongo.DESCENDING)], projection=[]):
+                    existing_count += 1
+                    if existing_count >= keep:
+                        await self.bot.db.backups.delete_one({"_id": backup["_id"]})
 
             await self._store_backup(interval["user"], data, interval=True)
         finally:
