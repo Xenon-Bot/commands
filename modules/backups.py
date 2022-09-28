@@ -900,6 +900,8 @@ class BackupsModule(Module):
             description += "This backup doesn't contain any messages, members, or bans! " \
                            "[⭐ Learn More](https://wiki.xenon.bot/en/premium)\n​"
 
+        expires_at = f"<t:{int(props['expires_at'].timestamp())}:R>" if props.get(
+            "expires_at") is not None else "`forever`"
         return dict(
             embeds=[{
                 "title": f"Backup Info - *{data.name}*",
@@ -910,6 +912,11 @@ class BackupsModule(Module):
                     {
                         "name": "Created At",
                         "value": f"<t:{int(props['timestamp'].timestamp())}:R>",
+                        "inline": False
+                    },
+                    {
+                        "name": "Stored Until",
+                        "value": expires_at,
                         "inline": False
                     },
                     {
