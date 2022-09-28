@@ -10,7 +10,7 @@ from dbots.cmd import *
 from util import *
 
 MUTATIONS_PER_PAGE = 10
-MUTATION_TITLES = dict(
+MUTATION_TITLES_PAST = dict(
     guild_update="Server Updated",
     channel_update="Channel Updated",
     channel_delete="Channel Deleted",
@@ -29,10 +29,32 @@ MUTATION_TITLES = dict(
     sticker_delete="Sticker Deleted",
     sticker_update="Sticker Updated",
 )
+MUTATION_TITLES = dict(
+    guild_update="Update Server",
+    channel_update="Update Channel",
+    channel_delete="Delete Channel",
+    channel_create="Create Channel",
+    thread_update="Update Thread",
+    thread_delete="Delete Thread",
+    thread_create="Create Thread",
+    role_update="Update Role",
+    role_delete="Delete Role",
+    role_create="Create Role",
+    bans_update="Update Ban",
+    emoji_create="Create Emoji",
+    emoji_delete="Delete Emoji",
+    emoji_update="Update Emoji",
+    sticker_create="Create Sticker",
+    sticker_delete="Delete Sticker",
+    sticker_update="Update Sticker",
+)
 
 
-def get_mutation_title(mutation):
-    return MUTATION_TITLES.get(mutation.kind, "Unknown Mutation Type")
+def get_mutation_title(mutation, past=True):
+    if past:
+        return MUTATION_TITLES_PAST.get(mutation.kind, "Unknown Mutation Type")
+    else:
+        return MUTATION_TITLES.get(mutation.kind, "Unknown Mutation Type")
 
 
 def get_mutation_sub_title(mutation, data):
@@ -142,35 +164,6 @@ class MutationsModule(Module):
     async def _get_changes_list_page(self, guild_id, start_timestamp, end_timestamp, skip=0):
         mutations = await self._list_mutations(guild_id, start_timestamp, end_timestamp, skip)
 
-        if len(mutations) == 0:
-            return dict(
-                **create_message(
-                    "There **aren't any changes** yet.",
-                    f=Format.INFO
-                ),
-                ephemeral=True
-            )
-
-        fields = []
-        select_options = []
-        for i, (bucket, mutation) in enumerate(mutations):
-            mutation_id = f"{bucket.start_snapshot_id}_{mutation.hash}"
-            data = json.loads(mutation.data)
-
-            title = get_mutation_title(mutation)
-            sub_title = get_mutation_sub_title(mutation, data)
-            value_list = get_mutation_value_list(data)
-
-            fields.append(dict(
-                name=f"{i + 1}. {title}",
-                value=f"{sub_title}\n{value_list}{'​' if i != len(mutations) - 1 else ''}",
-            ))
-
-            select_options.append(SelectMenuOption(
-                label=f"{i + 1}. {title}",
-                value=mutation_id
-            ))
-
         if skip == 0:
             next_args = [str(end_timestamp), "", "0"]
         else:
@@ -185,30 +178,59 @@ class MutationsModule(Module):
             new_start_timestamp = datetime.fromtimestamp(start_timestamp) - timedelta(hours=6)
             previous_args = [str(int(new_start_timestamp.timestamp())), str(start_timestamp), "0"]
 
+        components = [
+            ActionRow(
+                Button(label="Previous Page", custom_id=f"change_list", args=previous_args),
+                Button(label="Next Page", custom_id=f"change_list", args=next_args,
+                       disabled=end_timestamp is None and skip == 0)
+            )
+        ]
+        fields = []
+        if len(mutations) != 0:
+            select_options = []
+            for i, (bucket, mutation) in enumerate(mutations):
+                mutation_id = f"{bucket.start_snapshot_id}_{mutation.hash}"
+                data = json.loads(mutation.data)
+
+                title = get_mutation_title(mutation)
+                sub_title = get_mutation_sub_title(mutation, data)
+                value_list = get_mutation_value_list(data)
+
+                fields.append(dict(
+                    name=f"{i + 1}. {title}",
+                    value=f"{sub_title}\n{value_list}{'​' if i != len(mutations) - 1 else ''}",
+                ))
+
+                select_options.append(SelectMenuOption(
+                    label=f"{i + 1}. {title}",
+                    value=mutation_id
+                ))
+
+            components.insert(0, ActionRow(
+                SelectMenu(
+                    *select_options,
+                    max_values=1,
+                    min_values=1,
+                    custom_id="change_info",
+                    placeholder="Select to revert"
+                )
+            ))
+
+            description = f"Displaying changes from **<t:{mutations[0][0].start_timestamp}>** until **<t:{mutations[-1][0].end_timestamp}>**.\n\n" \
+                          f"Select a change from below to get more information about it or revert it.\n​"
+
+        else:
+            description = f"Displaying changes from **<t:{start_timestamp}>** until **<t:{end_timestamp}>**.\n\n" \
+                          f"No changes were made in this time period."
+
         return dict(
             embeds=[dict(
                 title="Server Changes",
                 fields=fields,
                 color=Format.INFO.color,
-                description=f"Displaying changes from **<t:{mutations[0][0].start_timestamp}>** until **<t:{mutations[-1][0].end_timestamp}>**.\n\n"
-                            f"Select a change from below to get more information about it or revert it.\n​",
+                description=description,
             )],
-            components=[
-                ActionRow(
-                    SelectMenu(
-                        *select_options,
-                        max_values=1,
-                        min_values=1,
-                        custom_id="change_info",
-                        placeholder="Select to revert"
-                    )
-                ),
-                ActionRow(
-                    Button(label="Previous Page", custom_id=f"change_list", args=previous_args),
-                    Button(label="Next Page", custom_id=f"change_list", args=next_args,
-                           disabled=end_timestamp is None and skip == 0)
-                )
-            ],
+            components=components,
             ephemeral=True
         )
 
@@ -263,12 +285,11 @@ class MutationsModule(Module):
             embeds=[dict(
                 title=get_mutation_title(mutation),
                 color=Format.INFO.color,
-                description=f"{description}\n\n *Click `Revert Change` to revert this change or "
-                            f"`Revert All After This` to revert this change and all changes that happened after it.*"
+                description=f"{description}\n\n *Click `Revert Change` to revert this change or.*"
             )],
             components=[
                 ActionRow(
-                    Button(style=ButtonStyle.PRIMARY, label="Revert Change", custom_id=f"revert_preview",
+                    Button(style=ButtonStyle.PRIMARY, label="Revert Change", custom_id=f"change_revert_preview",
                            args=["one", mutation_id]),
                     # Button(style=ButtonStyle.SECONDARY, label="Revert All After This", custom_id=f"revert_preview",
                     #        args=["until", mutation_id])
@@ -278,12 +299,71 @@ class MutationsModule(Module):
         )
 
     @Module.component(name="change_revert_preview")
-    async def revert_preview(self, ctx, mode, mutation_hash):
-        pass
+    async def revert_preview(self, ctx, mode, mutation_id):
+        start_snapshot_id, mutation_hash = mutation_id.split("_")
+
+        resp = await self.bot.rpc.mutations.PreviewRevertMutations(service_pb2.PreviewRevertMutationsRequest(
+            guild_id=int(ctx.guild_id),
+            start_snapshot_id=start_snapshot_id,
+            target=service_pb2.RevertMutationsTarget(
+                one=service_pb2.RevertMutationsTargetOne(
+                    mutation_hash=mutation_hash
+                )
+            )
+        ))
+
+        fields = []
+        for i, mutation in enumerate(resp.mutations):
+            data = json.loads(mutation.data)
+
+            title = get_mutation_title(mutation, past=False)
+            sub_title = get_mutation_sub_title(mutation, data)
+            value_list = get_mutation_value_list(data)
+
+            fields.append(dict(
+                name=f"{i + 1}. {title}",
+                value=f"{sub_title}\n{value_list}{'​' if i != len(resp.mutations) - 1 else ''}",
+            ))
+
+        await ctx.update(
+            embeds=[dict(
+                title="The following changes will be made",
+                color=Format.INFO.color,
+                description=f"*Click `Revert Change` to revert this change.\n​*",
+                fields=fields
+            )],
+            components=[
+                ActionRow(
+                    Button(style=ButtonStyle.DANGER, label="Revert Changes", custom_id=f"change_revert",
+                           args=[mode, mutation_id]),
+                )
+            ],
+            ephemeral=True
+        )
 
     @Module.component(name="change_revert")
     @entitlement_required
     @checks.has_permissions_level(destructive=True)
     @checks.bot_has_permissions("administrator")
-    async def revert(self, ctx, mode, mutation_hash):
-        pass
+    async def revert(self, ctx, mode, mutation_id):
+        start_snapshot_id, mutation_hash = mutation_id.split("_")
+
+        await ctx.update(**create_message(
+            "The changes are being reverted. This may take a while...",
+            f=Format.PLEASE_WAIT
+        ))
+
+        await self.bot.rpc.mutations.RevertMutations(service_pb2.RevertMutationsRequest(
+            guild_id=int(ctx.guild_id),
+            start_snapshot_id=start_snapshot_id,
+            target=service_pb2.RevertMutationsTarget(
+                one=service_pb2.RevertMutationsTargetOne(
+                    mutation_hash=mutation_hash
+                )
+            )
+        ))
+
+        await ctx.update(**create_message(
+            "The changes have been reverted.",
+            f=Format.SUCCESS
+        ))

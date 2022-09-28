@@ -80,6 +80,15 @@ class Xenon(InteractionBot):
             except rest.HTTPException:
                 pass
 
+    async def execute_component(self, component, payload, args):
+        premium_level = 0
+        user_doc = await self.db.users.find_one({"_id": payload.author.id})
+        if user_doc is not None:
+            premium_level = user_doc.get("tier", 0)
+
+        payload.premium_level = PremiumLevel(premium_level)
+        return await super().execute_component(component, payload, args)
+
     async def execute_command(self, command, payload, remaining_options):
         await self.redis.hincrby("cmd:commands", command.full_name, 1)
 
@@ -107,7 +116,6 @@ class Xenon(InteractionBot):
             premium_level = user_doc.get("tier", 0)
 
         payload.premium_level = PremiumLevel(premium_level)
-
         return await super().execute_command(command, payload, remaining_options)
 
     async def get_invite(self):
