@@ -14,7 +14,7 @@ from xenon.backups import backup_pb2
 
 from dbots import *
 from dbots.cmd import *
-from util import can_upsell
+from util import can_upsell, PremiumLevel
 from . import premium
 from .audit_logs import AuditLogType
 
@@ -372,7 +372,7 @@ class BackupsModule(Module):
                 raise
 
         data = replies[-1].data
-        expires = len(ctx.entitlement_sku_ids) == 0
+        expires = len(ctx.entitlement_sku_ids) == 0 and ctx.premium_level == PremiumLevel.NONE
         backup_id = await self._store_backup(ctx.author.id, data, expires=expires)
 
         await ctx.edit_response(**create_message(
@@ -872,6 +872,8 @@ class BackupsModule(Module):
             description += "This backup doesn't contain any messages, members, or bans! " \
                            "[⭐ Learn More](https://wiki.xenon.bot/en/premium)\n​"
 
+        expires_at = f"<t:{int(props['expires_at'].timestamp())}:R>" if props.get(
+            "expires_at") is not None else "`forever`"
         return dict(
             embeds=[{
                 "title": f"Backup Info - *{data.name}*",
@@ -882,6 +884,11 @@ class BackupsModule(Module):
                     {
                         "name": "Created At",
                         "value": f"<t:{int(props['timestamp'].timestamp())}:R>",
+                        "inline": False
+                    },
+                    {
+                        "name": "Stored Until",
+                        "value": expires_at,
                         "inline": False
                     },
                     {
