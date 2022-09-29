@@ -101,7 +101,7 @@ def get_mutation_value_list(data, max_values=3):
 
 
 class MutationsModule(Module):
-    @Module.command(default_member_permissions=Permissions.FlagList.administrator, dm_permission=False, beta=True)
+    @Module.command(default_member_permissions=Permissions.FlagList.administrator, dm_permission=False)
     async def changes(self, ctx):
         """
         View and revert changes made to your Discord server
