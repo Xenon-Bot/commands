@@ -220,7 +220,8 @@ class MutationsModule(Module):
                           f"Select a change from below to get more information about it or revert it.\n​"
 
         else:
-            description = f"Displaying changes from **<t:{start_timestamp}>** until **<t:{end_timestamp}>**.\n\n" \
+            _end_timestamp = end_timestamp or int(datetime.utcnow().timestamp())
+            description = f"Displaying changes from **<t:{start_timestamp}>** until **<t:{_end_timestamp}>**.\n\n" \
                           f"No changes were made in this time period."
 
         return dict(
