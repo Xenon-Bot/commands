@@ -5,22 +5,24 @@ import traceback
 from datetime import datetime
 
 import grpc.aio
+from dbots import *
+from dbots.cmd import *
 from motor.motor_asyncio import AsyncIOMotorClient
 from xenon.backups import backup_pb2_grpc
 from xenon.mutations import service_pb2_grpc as mutation_pb2_grpc
 
 import config
-from dbots import *
-from dbots.cmd import *
 from util import PremiumLevel
 
 
 class RpcCollection:
     def __init__(self):
-        backups_channel = grpc.aio.insecure_channel(config.BACKUPS_SERVICES)
+        options = [('grpc.max_message_length', 256 * 1024 * 1024)]
+
+        backups_channel = grpc.aio.insecure_channel(config.BACKUPS_SERVICES, options=options)
         self.backups = backup_pb2_grpc.BackupServiceStub(backups_channel)
 
-        mutations_channel = grpc.aio.insecure_channel(config.MUTATIONS_SERVICE)
+        mutations_channel = grpc.aio.insecure_channel(config.MUTATIONS_SERVICE, options=options)
         self.mutations = mutation_pb2_grpc.MutationServiceStub(mutations_channel)
 
 
