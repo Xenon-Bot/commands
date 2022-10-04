@@ -18,7 +18,12 @@ from util import PremiumLevel
 
 class RpcCollection:
     def __init__(self):
-        options = [('grpc.max_message_length', 256 * 1024 * 1024)]
+        max_message_length = 256 * 1024 * 1024
+        options = [
+            ('grpc.max_send_message_length', max_message_length),
+            ('grpc.max_receive_message_length', max_message_length),
+            ('grpc.max_message_length', max_message_length)
+        ]
 
         backups_channel = grpc.aio.insecure_channel(config.BACKUPS_SERVICES, options=options)
         self.backups = backup_pb2_grpc.BackupServiceStub(backups_channel)
