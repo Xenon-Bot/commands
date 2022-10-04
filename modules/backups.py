@@ -1486,11 +1486,11 @@ class BackupsModule(Module):
             }})
 
             try:
-                replies = await self.bot.rpc.backups.Create(backup_pb2.CreateRequest(
+                replies = [resp async for resp in self.bot.rpc.backups.Create(backup_pb2.CreateRequest(
                     guild_id=interval["guild"],
                     options=["roles", "channels", "settings", "members", "bans", "messages"],
                     message_count=interval.get("chatlog", 0)
-                ))
+                ))]
             except AioRpcError as e:
                 if e.code() == grpc.StatusCode.NOT_FOUND:
                     await self.bot.db.premium.intervals.delete_many({"guild": interval["guild"]})
