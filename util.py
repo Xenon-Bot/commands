@@ -26,7 +26,7 @@ class PremiumLevel(IntEnum):
 
 
 def can_upsell(ctx):
-    return config.CAN_UPSELL and ctx.guild_id in {"1023015746378403962", "1023015685829447751"}
+    return config.CAN_UPSELL and ctx.ctx.entitlement_sku_ids is not None
 
 
 @Check
@@ -43,7 +43,7 @@ async def premium_required(ctx, **_):
 
 @Check
 async def entitlement_required(ctx, **_):
-    if len(ctx.entitlement_sku_ids) == 0 and ctx.premium_level == PremiumLevel.NONE:
+    if not ctx.entitlement_sku_ids and ctx.premium_level == PremiumLevel.NONE:
         if can_upsell(ctx):
             await ctx.upsell()
         else:
