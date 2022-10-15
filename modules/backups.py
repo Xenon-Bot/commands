@@ -372,7 +372,7 @@ class BackupsModule(Module):
                 raise
 
         data = replies[-1].data
-        expires = len(ctx.entitlement_sku_ids) == 0 and ctx.premium_level == PremiumLevel.NONE
+        expires = not ctx.entitlement_sku_ids and ctx.premium_level == PremiumLevel.NONE
         backup_id = await self._store_backup(ctx.author.id, data, expires=expires)
 
         await ctx.edit_response(**create_message(
@@ -1270,8 +1270,8 @@ class BackupsModule(Module):
             interval_td = timedelta(hours=24)
 
         hours = interval_td.total_seconds() // 3600
-        keep = 4 if len(ctx.entitlement_sku_ids) != 0 else 1
-        if hours < 24 and len(ctx.entitlement_sku_ids) == 0:
+        keep = 4 if ctx.entitlement_sku_ids else 1
+        if hours < 24 and not ctx.entitlement_sku_ids:
             if can_upsell(ctx):
                 await ctx.upsell()
             else:
