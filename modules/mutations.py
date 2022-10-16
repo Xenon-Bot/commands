@@ -2,11 +2,11 @@ import json
 from datetime import datetime, timedelta
 
 import grpc
+from dbots import *
+from dbots.cmd import *
 from grpc.aio import AioRpcError
 from xenon.mutations import service_pb2
 
-from dbots import *
-from dbots.cmd import *
 from util import *
 
 MUTATIONS_PER_PAGE = 10
@@ -217,6 +217,7 @@ class MutationsModule(Module):
             ))
 
             description = f"Displaying changes from **<t:{mutations[0][0].start_timestamp}>** until **<t:{mutations[-1][0].end_timestamp}>**.\n\n" \
+                          f"The order of changes is not guaranteed to be correct.\n" \
                           f"Select a change from below to get more information about it or revert it.\n​"
 
         else:
