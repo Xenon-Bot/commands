@@ -26,7 +26,7 @@ class PremiumLevel(IntEnum):
 
 
 def can_upsell(ctx):
-    return config.CAN_UPSELL and ctx.ctx.entitlement_sku_ids is not None
+    return config.CAN_UPSELL and ctx.entitlement_sku_ids is not None
 
 
 @Check
