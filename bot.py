@@ -89,6 +89,23 @@ class Xenon(InteractionBot):
             except rest.HTTPException:
                 pass
 
+    async def _set_user_entitlement_active(self, member):
+        await self.db.users.update_one(
+            {"_id": member.id},
+            {
+                "$set": {
+                    "_id": member.id,
+                    **member.to_dict()["user"],
+                    "entitlement_active": True,
+                },
+                "$setOnInsert": {
+                    "tier": 0,
+                    "manual_tier": False
+                }
+            },
+            upsert=True
+        )
+
     async def execute_component(self, component, payload, args):
         premium_level = 0
         user_doc = await self.db.users.find_one({"_id": payload.author.id})
@@ -118,6 +135,9 @@ class Xenon(InteractionBot):
                     f"```{blacklist['reason']}```",
                     f=Format.ERROR
                 ), ephemeral=True)
+
+        if payload.entitlement_sku_ids:
+            await self._set_user_entitlement_active(payload.author)
 
         premium_level = 0
         user_doc = await self.db.users.find_one({"_id": payload.author.id})
