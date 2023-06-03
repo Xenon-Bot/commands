@@ -37,11 +37,11 @@ class ClipboardModule(Module):
             f=Format.PLEASE_WAIT
         ), ephemeral=True)
 
-        replies = await self.bot.rpc.backups.Create(backups_pb2.CreateRequest(
+        replies = [resp async for resp in self.bot.rpc.backups.Create(backup_pb2.CreateRequest(
             guild_id=ctx.guild_id,
             options=["roles", "channels", "settings", "members", "bans", "messages"],
             message_count=message_count
-        ))
+        ))]
 
         data = replies[-1].data
         raw = await self.bot.loop.run_in_executor(None, lambda: brotli.compress(data.SerializeToString()))
@@ -183,14 +183,14 @@ class ClipboardModule(Module):
         ))
 
         try:
-            replies = await self.bot.rpc.backups.Load(backup_pb2.LoadRequest(
+            replies = [reply async for reply in self.bot.rpc.backups.Load(backup_pb2.LoadRequest(
                 guild_id=ctx.guild_id,
                 options=list(options),
                 message_count=message_count,
                 data=data,
                 reason="Backup loaded by " + str(ctx.author),
                 ids=ids
-            ))
+            ))]
         except AioRpcError as e:
             if e.code() == grpc.StatusCode.ALREADY_EXISTS:
                 await ctx.update(**create_message(
